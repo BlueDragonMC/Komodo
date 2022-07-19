@@ -1,0 +1,24 @@
+# This Dockerfile must be run with BuildKit enabled
+# see https://docs.docker.com/engine/reference/builder/#buildkit
+
+# Build the project into an executable JAR
+FROM gradle:jdk17 as build
+# Copy build files and source code
+COPY . /work
+WORKDIR /work
+# Run gradle in the /work directory
+RUN --mount=target=/home/gradle/.gradle,type=cache \
+    /usr/bin/gradle --console=rich --warn --stacktrace --no-daemon --build-cache build
+
+# Run Velocity with the built JAR in its plugins folder and expose port 25565
+FROM eclipse-temurin:17
+
+ARG VELOCITY_VERSION="3.1.2-SNAPSHOT"
+ARG VELOCITY_BUILD_NUMBER=162
+
+EXPOSE 25565
+WORKDIR /proxy
+ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/builds/$VELOCITY_BUILD_NUMBER/downloads/velocity-$VELOCITY_VERSION-$VELOCITY_BUILD_NUMBER.jar" /proxy/proxy.jar
+COPY --from=build /work/build/libs/Komodo-*.jar /proxy/plugins/Komodo.jar
+COPY /assets /proxy
+CMD ["sh", "/proxy/entrypoint.sh"]
