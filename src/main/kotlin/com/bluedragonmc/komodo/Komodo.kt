@@ -62,7 +62,8 @@ class Komodo {
             instanceMap[message.containerId]?.remove(message.instanceId)
             if (instanceMap[message.containerId]?.size == 0) {
                 instanceMap.remove(message.containerId)
-                proxyServer.unregisterServer(proxyServer.getServer(message.containerId.toString()).getOrNull()?.serverInfo
+                proxyServer.unregisterServer(proxyServer.getServer(message.containerId.toString())
+                    .getOrNull()?.serverInfo
                     ?: run {
                         logger.warning("Tried to unregister server that didn't exist! containerId=${message.containerId}")
                         return@subscribe
@@ -72,7 +73,12 @@ class Komodo {
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
             val player = proxyServer.getPlayer(message.player).getOrNull() ?: return@subscribe
-            val registeredServer = proxyServer.getServer(getContainerId(message.instance)).getOrNull() ?: run {
+            val containerId = getContainerId(message.instance)
+            if (containerId == null) {
+                logger.warning("Received SendPlayerToInstanceMessage for unknown server: instanceId=${message.instance}, containerId=???")
+                return@subscribe
+            }
+            val registeredServer = proxyServer.getServer(containerId).getOrNull() ?: run {
                 logger.warning("Received SendPlayerToInstanceMessage for unknown server: instanceId=${message.instance}, containerId=???")
                 return@subscribe
             }
@@ -93,16 +99,17 @@ class Komodo {
         val registeredServer = proxyServer.allServers.filter { registeredServer ->
             instanceMap[UUID.fromString(registeredServer.serverInfo.name)]?.any { lobbies.contains(it) } == true
         }.maxByOrNull { it.playersConnected.size }
-        if(registeredServer != null) {
+        if (registeredServer != null) {
             event.setInitialServer(registeredServer)
             client.publish(SendPlayerToInstanceMessage(event.player.uniqueId,
                 UUID.fromString(registeredServer.serverInfo.name)))
         } else {
             logger.warning("No lobby found for ${event.player} to join!")
-            event.player.disconnect(Component.text("No lobby was found for you to join! Try rejoining in a few minutes.", NamedTextColor.RED))
-            if(System.currentTimeMillis() - lastCreateInstanceMessage > minServerCreationDelay) {
+            event.player.disconnect(Component.text("No lobby was found for you to join! Try rejoining in a few minutes.",
+                NamedTextColor.RED))
+            if (System.currentTimeMillis() - lastCreateInstanceMessage > minServerCreationDelay) {
                 val containerId = instanceMap.minByOrNull { it.value.size }?.key
-                if(containerId != null) {
+                if (containerId != null) {
                     client.publish(RequestCreateInstanceMessage(containerId, GameType(lobbyGameName)))
                     lastCreateInstanceMessage = System.currentTimeMillis()
                 }
