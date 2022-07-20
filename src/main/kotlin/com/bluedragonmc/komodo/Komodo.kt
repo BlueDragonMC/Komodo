@@ -31,7 +31,7 @@ class Komodo {
     lateinit var logger: Logger
 
     @Inject
-    lateinit var server: ProxyServer
+    lateinit var proxyServer: ProxyServer
 
     @Inject
     @DataDirectory
@@ -49,7 +49,7 @@ class Komodo {
         client.subscribe(PingMessage::class) { message ->
             logger.info("Adding server at ${message.containerId}:25565")
             val str = message.containerId.toString()
-            server.registerServer(ServerInfo(str, InetSocketAddress(str, 25565)))
+            proxyServer.registerServer(ServerInfo(str, InetSocketAddress(str, 25565)))
         }
         client.subscribe(NotifyInstanceCreatedMessage::class) { message ->
             instanceMap.getOrPut(message.containerId) { mutableListOf() }.add(message.instanceId)
@@ -62,23 +62,24 @@ class Komodo {
             instanceMap[message.containerId]?.remove(message.instanceId)
             if (instanceMap[message.containerId]?.size == 0) {
                 instanceMap.remove(message.containerId)
-                server.unregisterServer(server.getServer(message.containerId.toString()).getOrNull()?.serverInfo
+                proxyServer.unregisterServer(proxyServer.getServer(message.containerId.toString()).getOrNull()?.serverInfo
                     ?: run {
                         logger.warning("Tried to unregister server that didn't exist! containerId=${message.containerId}")
                         return@subscribe
                     })
+                logger.info("Removed server with containerId=${message.containerId} because its last instance was removed.")
             }
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
-            val player = server.getPlayer(message.player).getOrNull() ?: return@subscribe
-            val server = server.getServer(getContainerId(message.instance)).getOrNull() ?: run {
+            val player = proxyServer.getPlayer(message.player).getOrNull() ?: return@subscribe
+            val registeredServer = proxyServer.getServer(getContainerId(message.instance)).getOrNull() ?: run {
                 logger.warning("Received SendPlayerToInstanceMessage for unknown server: instanceId=${message.instance}, containerId=???")
                 return@subscribe
             }
             // Don't try to send a player to their own server
-            if (player.currentServer.isPresent && player.currentServer == server) return@subscribe
-            player.createConnectionRequest(server).fireAndForget()
-            logger.info("Sending player $player to server $server")
+            if (player.currentServer.getOrNull() == registeredServer) return@subscribe
+            player.createConnectionRequest(registeredServer).fireAndForget()
+            logger.info("Sending player $player to server $registeredServer")
         }
     }
 
@@ -89,13 +90,13 @@ class Komodo {
     @Subscribe
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
         // When a player joins, send them to the lobby with the most players
-        val backendServer = server.allServers.filter { registeredServer ->
+        val registeredServer = proxyServer.allServers.filter { registeredServer ->
             instanceMap[UUID.fromString(registeredServer.serverInfo.name)]?.any { lobbies.contains(it) } == true
         }.maxByOrNull { it.playersConnected.size }
-        if(backendServer != null) {
-            event.setInitialServer(backendServer)
+        if(registeredServer != null) {
+            event.setInitialServer(registeredServer)
             client.publish(SendPlayerToInstanceMessage(event.player.uniqueId,
-                UUID.fromString(backendServer.serverInfo.name)))
+                UUID.fromString(registeredServer.serverInfo.name)))
         } else {
             logger.warning("No lobby found for ${event.player} to join!")
             event.player.disconnect(Component.text("No lobby was found for you to join! Try rejoining in a few minutes.", NamedTextColor.RED))
