@@ -8,13 +8,17 @@ import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
+import com.velocitypowered.api.network.ProtocolVersion
 import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.ProxyServer
+import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
+import com.velocitypowered.api.proxy.server.ServerPing
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import java.net.InetSocketAddress
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
 import kotlin.jvm.optionals.getOrNull
@@ -22,7 +26,7 @@ import kotlin.jvm.optionals.getOrNull
 @Plugin(
     id = "komodo",
     name = "Komodo",
-    version = "0.0.2",
+    version = "0.0.3",
     description = "BlueDragon's Velocity plugin that handles coordination with our service",
     url = "https://bluedragonmc.com",
     authors = ["FluxCapacitor2"]
@@ -88,11 +92,27 @@ class Komodo {
     private val lobbyGameName = "Lobby"
     private val enableCreateNewInstances = false
 
+    /**
+     * Use some ugly reflection to use part of Velocity's implementation that isn't exposed in its API
+     * The [RegisteredServer#ping] method does not allow us to specify a protocol version, so it uses
+     * `ProtocolVersion.UNKNOWN` by default. We want to change this default and specify the client's
+     * protocol version.
+     */
+    private val callServerListPing by lazy {
+        val velocityRegisteredServerClass = Class.forName("com.velocitypowered.proxy.server.VelocityRegisteredServer")
+        val eventLoopClass = Class.forName("io.netty.channel.EventLoop")
+        val ping = velocityRegisteredServerClass.getDeclaredMethod("ping", eventLoopClass, ProtocolVersion::class.java)
+
+        return@lazy { rs: RegisteredServer, version: ProtocolVersion ->
+            ping.invoke(velocityRegisteredServerClass.cast(rs), null, version) as CompletableFuture<ServerPing>
+        }
+    }
+
     @Subscribe
     fun onServerListPing(event: ProxyPingEvent) {
         // When a client calls a server list ping, forward a ping from a backend server.
         proxyServer.allServers.forEach {
-            val ping = it.ping().get(1, TimeUnit.SECONDS)
+            val ping = callServerListPing(it, event.connection.protocolVersion).get(1, TimeUnit.SECONDS)
             event.ping = ping
             return
         }

@@ -5,7 +5,7 @@ plugins {
 }
 
 rootProject.group = "com.bluedragonmc"
-rootProject.version = "0.0.1"
+rootProject.version = "0.0.3"
 
 repositories {
     mavenCentral()
