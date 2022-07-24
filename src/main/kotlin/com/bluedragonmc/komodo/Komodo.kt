@@ -2,6 +2,7 @@ package com.bluedragonmc.komodo
 
 import com.bluedragonmc.messages.*
 import com.bluedragonmc.messagingsystem.AMQPClient
+import com.bluedragonmc.messagingsystem.message.Message
 import com.google.inject.Inject
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
@@ -21,6 +22,7 @@ import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
+import kotlin.concurrent.timer
 import kotlin.jvm.optionals.getOrNull
 
 @Plugin(
@@ -43,6 +45,9 @@ class Komodo {
 
     private val instanceMap = mutableMapOf<UUID, MutableList<UUID>>()
     private val lobbies = mutableSetOf<UUID>()
+
+    private val pingTimes = mutableMapOf<UUID, Long>()
+    private val ownMessages = mutableListOf<Message>()
 
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
@@ -74,6 +79,10 @@ class Komodo {
             }
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
+            if(ownMessages.contains(message)) { // If this message was sent by Komodo there is no reason to handle it.
+                ownMessages.remove(message)
+                return@subscribe
+            }
             val player = proxyServer.getPlayer(message.player).getOrNull() ?: return@subscribe
             val registeredServer =
                 getContainerId(message.instance)?.let { proxyServer.getServer(it).getOrNull() } ?: run {
@@ -93,9 +102,29 @@ class Komodo {
         client.subscribe(ServerSyncMessage::class) { message ->
             // Every 30 seconds, this message is sent from each Minestom server.
             // It prevents desync between the proxy and the backend servers by updating the instance list on an interval.
+            if (!instanceMap.containsKey(message.containerId)) {
+                logger.info("New container added during sync: ${message.containerId}")
+                val str = message.containerId.toString()
+                proxyServer.registerServer(ServerInfo(str, InetSocketAddress(str, 25565)))
+                logger.info("(Sync) Registered server at $str:25565")
+            }
             instanceMap[message.containerId] = message.instances.map { it.instanceId }.toMutableList()
             val newLobbies = message.instances.filter { it.type?.name == lobbyGameName }.map { it.instanceId }
             lobbies.addAll(newLobbies)
+            pingTimes[message.containerId] = System.currentTimeMillis()
+        }
+        timer("ping-timeout", daemon = true, period = 10_000) {
+            pingTimes.forEach { (containerId, time) ->
+                if (System.currentTimeMillis() - time > 300_000) { // 5 minutes
+                    logger.warning("Removed server $containerId because it has not sent a ping in the last 5 minutes.")
+                    instanceMap.remove(containerId)
+                    runCatching {
+                        proxyServer.unregisterServer(
+                            proxyServer.getServer(containerId.toString()).getOrNull()?.serverInfo
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -112,8 +141,11 @@ class Komodo {
      */
     private val callServerListPing by lazy {
         val velocityRegisteredServerClass = Class.forName("com.velocitypowered.proxy.server.VelocityRegisteredServer")
-        val eventLoopClass = Class.forName("io.netty.channel.EventLoop")
-        val ping = velocityRegisteredServerClass.getDeclaredMethod("ping", eventLoopClass, ProtocolVersion::class.java)
+        val ping = velocityRegisteredServerClass.getDeclaredMethod(
+            "ping",
+            Class.forName("io.netty.channel.EventLoop"),
+            ProtocolVersion::class.java
+        )
 
         return@lazy { rs: RegisteredServer, version: ProtocolVersion ->
             ping.invoke(velocityRegisteredServerClass.cast(rs), null, version) as CompletableFuture<ServerPing>
@@ -142,7 +174,7 @@ class Komodo {
                 SendPlayerToInstanceMessage(
                     event.player.uniqueId,
                     getLobby(registeredServer.serverInfo.name)!!
-                )
+                ).also { ownMessages.add(it) }
             )
             return
         }
@@ -166,7 +198,8 @@ class Komodo {
         }
     }
 
-    private fun getLobby(serverName: String): UUID? = instanceMap[UUID.fromString(serverName)]?.firstOrNull { lobbies.contains(it) }
+    private fun getLobby(serverName: String): UUID? =
+        instanceMap[UUID.fromString(serverName)]?.firstOrNull { lobbies.contains(it) }
 
     private fun getContainerId(instance: UUID): String? {
         for ((containerId, instances) in instanceMap) {
