@@ -42,7 +42,7 @@ class Komodo {
     lateinit var client: AMQPClient
 
     private val instanceMap = mutableMapOf<UUID, MutableList<UUID>>()
-    private val lobbies = mutableListOf<UUID>()
+    private val lobbies = mutableSetOf<UUID>()
 
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
@@ -82,8 +82,20 @@ class Komodo {
                 }
             // Don't try to send a player to their current server
             if (player.currentServer.getOrNull()?.serverInfo?.name == registeredServer.serverInfo.name) return@subscribe
-            player.createConnectionRequest(registeredServer).fireAndForget()
+            try {
+                player.createConnectionRequest(registeredServer).fireAndForget()
+            } catch (e: Throwable) {
+                logger.warning("Error sending player ${player.username} to server $registeredServer!")
+                e.printStackTrace()
+            }
             logger.info("Sending player $player to server $registeredServer")
+        }
+        client.subscribe(ServerSyncMessage::class) { message ->
+            // Every 30 seconds, this message is sent from each Minestom server.
+            // It prevents desync between the proxy and the backend servers by updating the instance list on an interval.
+            instanceMap[message.containerId] = message.instances.map { it.instanceId }.toMutableList()
+            val newLobbies = message.instances.filter { it.type?.name == lobbyGameName }.map { it.instanceId }
+            lobbies.addAll(newLobbies)
         }
     }
 
@@ -122,14 +134,14 @@ class Komodo {
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
         // When a player joins, send them to the lobby with the most players
         val registeredServer = proxyServer.allServers.filter { registeredServer ->
-            instanceMap[UUID.fromString(registeredServer.serverInfo.name)]?.any { lobbies.contains(it) } == true
+            getLobby(registeredServer.serverInfo.name) != null
         }.maxByOrNull { it.playersConnected.size }
         if (registeredServer != null) {
             event.setInitialServer(registeredServer)
             client.publish(
                 SendPlayerToInstanceMessage(
                     event.player.uniqueId,
-                    UUID.fromString(registeredServer.serverInfo.name)
+                    getLobby(registeredServer.serverInfo.name)!!
                 )
             )
             return
@@ -153,6 +165,8 @@ class Komodo {
             }
         }
     }
+
+    private fun getLobby(serverName: String): UUID? = instanceMap[UUID.fromString(serverName)]?.firstOrNull { lobbies.contains(it) }
 
     private fun getContainerId(instance: UUID): String? {
         for ((containerId, instances) in instanceMap) {

@@ -16,7 +16,7 @@ repositories {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.github.bluedragonmc:messagingsystem:3abc4b8a49")
-    implementation("com.github.bluedragonmc:messages:e8603cbe6e")
+    implementation("com.github.bluedragonmc:messages:a2a08c9d8e")
     compileOnly("com.velocitypowered:velocity-api:3.0.1")
     kapt("com.velocitypowered:velocity-api:3.0.1")
 }
