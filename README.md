@@ -16,4 +16,4 @@ DOCKER_BUILDKIT=1 docker build -t bluedragonmc/komodo:testing --label com.bluedr
 ```
 This uses the `Dockerfile` in the current directory to make an image with the version string `"testing"`.
 
-**Note**: When running inside Docker, a `forwarding_secret` environment variable must be passed to the container, which is used to create the `forwarding.secret` file in the container.
+**Note**: When running inside Docker, a `PUFFIN_VELOCITY_SECRET` environment variable must be passed to the container, which is used to create the `forwarding.secret` file in the container.
