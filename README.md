@@ -12,7 +12,10 @@ Build with `./gradlew build` and place the JAR from `build/libs/Komodo-x.x.x.jar
 ## Development
 This can be built as a docker container with the following command:
 ```shell
-DOCKER_BUILDKIT=1 docker build -t bluedragonmc/komodo:testing --label com.bluedragonmc.komodo.version=testing .
+$ DOCKER_BUILDKIT=1 docker build -t bluedragonmc/komodo:testing \
+  --label com.bluedragonmc.komodo.version=testing \
+  --label bluedragonmc.komodo.version=testing \
+  .
 ```
 This uses the `Dockerfile` in the current directory to make an image with the version string `"testing"`.
 

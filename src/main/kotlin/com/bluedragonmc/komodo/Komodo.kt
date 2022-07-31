@@ -114,7 +114,7 @@ class Komodo {
             pingTimes[message.containerId] = System.currentTimeMillis()
         }
         timer("ping-timeout", daemon = true, period = 10_000) {
-            pingTimes.forEach { (containerId, time) ->
+            pingTimes.entries.removeAll { (containerId, time) ->
                 if (System.currentTimeMillis() - time > 300_000) { // 5 minutes
                     logger.warning("Removed server $containerId because it has not sent a ping in the last 5 minutes.")
                     instanceMap.remove(containerId)
@@ -123,7 +123,8 @@ class Komodo {
                             proxyServer.getServer(containerId.toString()).getOrNull()?.serverInfo
                         )
                     }
-                }
+                    return@removeAll true
+                } else return@removeAll false
             }
         }
     }
