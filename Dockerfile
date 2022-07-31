@@ -16,6 +16,7 @@ FROM eclipse-temurin:17
 ARG VELOCITY_VERSION="3.1.2-SNAPSHOT"
 ARG VELOCITY_BUILD_NUMBER=162
 ARG REALIP_VERSION="2.6.0"
+ARG METRICS_VERSION="0.3.6"
 
 EXPOSE 25565
 WORKDIR /proxy
@@ -23,6 +24,8 @@ WORKDIR /proxy
 ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/builds/$VELOCITY_BUILD_NUMBER/downloads/velocity-$VELOCITY_VERSION-$VELOCITY_BUILD_NUMBER.jar" /proxy/proxy.jar
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
+# Add UnifiedMetrics by Cubxity
+ADD "https://github.com/Cubxity/UnifiedMetrics/releases/download/v$METRICS_VERSION/unifiedmetrics-platform-velocity-$METRICS_VERSION.jar" /proxy/plugins/UnifiedMetrics-$METRICS_VERSION.jar
 COPY --from=build /work/build/libs/Komodo-*.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
-CMD ["sh", "/proxy/entrypoint.sh"]
+CMD ["sh", "/proxy/komodo-entrypoint.sh"]
