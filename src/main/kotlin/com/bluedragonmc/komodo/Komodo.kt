@@ -79,7 +79,7 @@ class Komodo {
             }
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
-            if(ownMessages.contains(message)) { // If this message was sent by Komodo there is no reason to handle it.
+            if (ownMessages.contains(message)) { // If this message was sent by Komodo there is no reason to handle it.
                 ownMessages.remove(message)
                 return@subscribe
             }
@@ -158,7 +158,8 @@ class Komodo {
         // When a client calls a server list ping, forward a ping from a backend server.
         proxyServer.allServers.forEach {
             val ping = callServerListPing(it, event.connection.protocolVersion).get(1, TimeUnit.SECONDS)
-            event.ping = ping
+            event.ping = ping.asBuilder().onlinePlayers(proxyServer.allPlayers.size)
+                .maximumPlayers(proxyServer.configuration.showMaxPlayers).build()
             return
         }
     }
