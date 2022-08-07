@@ -69,6 +69,7 @@ class Komodo {
             instanceMap[message.containerId]?.remove(message.instanceId)
             if (instanceMap[message.containerId]?.size == 0) {
                 instanceMap.remove(message.containerId)
+                pingTimes.remove(message.containerId)
                 proxyServer.unregisterServer(proxyServer.getServer(message.containerId.toString())
                     .getOrNull()?.serverInfo
                     ?: run {
