@@ -24,7 +24,7 @@ ARG MC_MONITOR_VERSION="0.10.6"
 ADD https://github.com/itzg/mc-monitor/releases/download/$MC_MONITOR_VERSION/mc-monitor_${MC_MONITOR_VERSION}_linux_amd64.tar.gz /tmp/mc-monitor.tgz
 RUN tar -xf /tmp/mc-monitor.tgz -C /usr/local/bin mc-monitor && rm /tmp/mc-monitor.tgz
 
-HEALTHCHECK --start-period=10s --interval=5s --retries=4 CMD mc-monitor status --host localhost --port 25565
+HEALTHCHECK --start-period=10s --interval=5s --retries=4 CMD sh /proxy/health.sh
 
 WORKDIR /proxy
 # Add Velocity using the version specified in the build arg
