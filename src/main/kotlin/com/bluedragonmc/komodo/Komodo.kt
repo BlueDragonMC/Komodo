@@ -46,37 +46,19 @@ class Komodo {
     private val instanceMap = mutableMapOf<UUID, MutableList<UUID>>()
     private val lobbies = mutableSetOf<UUID>()
 
-    private val pingTimes = mutableMapOf<UUID, Long>()
     private val ownMessages = mutableListOf<Message>()
+
+    private val serviceDiscovery = ServiceDiscovery()
 
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
     fun onStart(event: ProxyInitializeEvent) {
         client = AMQPClient(polymorphicModuleBuilder = polymorphicModuleBuilder)
-        client.subscribe(PingMessage::class) { message ->
-            logger.info("Adding server at ${message.containerId}:25565")
-            val str = message.containerId.toString()
-            proxyServer.registerServer(ServerInfo(str, InetSocketAddress(str, 25565)))
-        }
         client.subscribe(NotifyInstanceCreatedMessage::class) { message ->
             instanceMap.getOrPut(message.containerId) { mutableListOf() }.add(message.instanceId)
-            if (message.gameType.name == lobbyGameName) {
+            if (message.gameType.name == LOBBY_GAME_NAME) {
                 logger.info("New lobby instance: instanceId=${message.instanceId}, containerId=${message.containerId}")
                 lobbies.add(message.instanceId)
-            }
-        }
-        client.subscribe(NotifyInstanceRemovedMessage::class) { message ->
-            instanceMap[message.containerId]?.remove(message.instanceId)
-            if (instanceMap[message.containerId]?.size == 0) {
-                instanceMap.remove(message.containerId)
-                pingTimes.remove(message.containerId)
-                proxyServer.unregisterServer(proxyServer.getServer(message.containerId.toString())
-                    .getOrNull()?.serverInfo
-                    ?: run {
-                        logger.warning("Tried to unregister server that didn't exist! containerId=${message.containerId}")
-                        return@subscribe
-                    })
-                logger.info("Removed server with containerId=${message.containerId} because its last instance was removed.")
             }
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
@@ -104,36 +86,51 @@ class Komodo {
             // Every 30 seconds, this message is sent from each Minestom server.
             // It prevents desync between the proxy and the backend servers by updating the instance list on an interval.
             if (!instanceMap.containsKey(message.containerId)) {
-                logger.info("New container added during sync: ${message.containerId}")
-                val str = message.containerId.toString()
-                proxyServer.registerServer(ServerInfo(str, InetSocketAddress(str, 25565)))
-                logger.info("(Sync) Registered server at $str:25565")
+                return@subscribe // GameServers are ONLY added via requests to Agones on the Kubernetes API
             }
             instanceMap[message.containerId] = message.instances.map { it.instanceId }.toMutableList()
-            val newLobbies = message.instances.filter { it.type?.name == lobbyGameName }.map { it.instanceId }
+            val newLobbies = message.instances.filter { it.type?.name == LOBBY_GAME_NAME }.map { it.instanceId }
             lobbies.addAll(newLobbies)
-            pingTimes[message.containerId] = System.currentTimeMillis()
         }
-        timer("ping-timeout", daemon = true, period = 10_000) {
-            pingTimes.entries.removeAll { (containerId, time) ->
-                if (System.currentTimeMillis() - time > 300_000) { // 5 minutes
-                    logger.warning("Removed server $containerId because it has not sent a ping in the last 5 minutes.")
-                    instanceMap.remove(containerId)
-                    runCatching {
-                        proxyServer.unregisterServer(
-                            proxyServer.getServer(containerId.toString()).getOrNull()?.serverInfo
+        timer("agones-update", daemon = true, period = 5_000) {
+            runCatching {
+                val gameServers = serviceDiscovery.listServices()
+                gameServers.forEach {
+
+                    val status = it.raw.getAsJsonObject("status")
+                    val address = status.get("address").asString
+                    val port = status.get("ports").asJsonArray.first { p ->
+                        p.asJsonObject.get("name").asString == "minecraft"
+                    }.asJsonObject.get("port").asInt
+
+                    val uid = UUID.fromString(it.metadata.uid)
+                    if (!instanceMap.containsKey(uid)) {
+                        logger.info("New game server created with UID: $uid")
+                        instanceMap[uid] = mutableListOf()
+                        proxyServer.registerServer(
+                            ServerInfo(
+                                it.metadata.uid,
+                                InetSocketAddress(
+                                    address,
+                                    port
+                                )
+                            )
                         )
                     }
-                    return@removeAll true
-                } else return@removeAll false
+                }
+                instanceMap.forEach { (uid, _) ->
+                    if (!gameServers.any { UUID.fromString(it.metadata.uid) == uid }) {
+                        val server = proxyServer.getServer(uid.toString()).getOrNull()?.serverInfo
+                        proxyServer.unregisterServer(server ?: return@forEach)
+                        logger.info("Game server with uid $uid does not exist anymore and has been unregistered.")
+                    }
+                }
+            }.onFailure {
+                logger.severe("Error updating registered servers with Agones: ${it::class.java.name}")
+                it.printStackTrace()
             }
         }
     }
-
-    private var lastCreateInstanceMessage: Long = 0L
-    private val minServerCreationDelay = 30000 // 30 seconds between [RequestCreateInstanceMessage]s
-    private val lobbyGameName = "Lobby"
-    private val enableCreateNewInstances = false
 
     /**
      * Use some ugly reflection to use part of Velocity's implementation that isn't exposed in its API
@@ -189,16 +186,6 @@ class Komodo {
                 NamedTextColor.RED
             )
         )
-
-        if (enableCreateNewInstances) {
-            if (System.currentTimeMillis() - lastCreateInstanceMessage > minServerCreationDelay) {
-                val containerId = instanceMap.minByOrNull { it.value.size }?.key
-                if (containerId != null) {
-                    client.publish(RequestCreateInstanceMessage(containerId, GameType(lobbyGameName)))
-                    lastCreateInstanceMessage = System.currentTimeMillis()
-                }
-            }
-        }
     }
 
     private fun getLobby(serverName: String): UUID? =
@@ -214,5 +201,9 @@ class Komodo {
     @Subscribe
     fun onStop(event: ProxyShutdownEvent) {
 
+    }
+
+    companion object {
+        private const val LOBBY_GAME_NAME = "Lobby"
     }
 }
