@@ -18,6 +18,7 @@ import com.velocitypowered.api.proxy.server.ServerPing
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -25,14 +26,12 @@ import java.util.logging.Logger
 import kotlin.concurrent.timer
 import kotlin.jvm.optionals.getOrNull
 
-@Plugin(
-    id = "komodo",
+@Plugin(id = "komodo",
     name = "Komodo",
     version = "0.0.3",
     description = "BlueDragon's Velocity plugin that handles coordination with our service",
     url = "https://bluedragonmc.com",
-    authors = ["FluxCapacitor2"]
-)
+    authors = ["FluxCapacitor2"])
 class Komodo {
 
     @Inject
@@ -53,6 +52,61 @@ class Komodo {
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
     fun onStart(event: ProxyInitializeEvent) {
+        startAMQPConnection()
+        timer("agones-update", daemon = true, period = 5_000) {
+            runCatching {
+                val gameServers = serviceDiscovery.listServices()
+                gameServers.forEach {
+
+                    val status = it.raw.getAsJsonObject("status") ?: return@forEach
+                    val address = status.get("address").asString ?: return@forEach
+                    if (!status.has("ports") || !status.get("ports").isJsonArray) return@forEach
+                    val port = status.get("ports")?.asJsonArray?.firstOrNull { p ->
+                        p.asJsonObject.get("name").asString == "minecraft"
+                    }?.asJsonObject?.get("port")?.asInt ?: return@forEach
+
+                    val uid = UUID.fromString(it.metadata.uid)
+                    if (!instanceMap.containsKey(uid)) {
+                        logger.info("New game server created with UID: $uid")
+                        instanceMap[uid] = mutableListOf()
+                        proxyServer.registerServer(ServerInfo(it.metadata.uid, InetSocketAddress(address, port)))
+                    }
+                }
+                instanceMap.forEach { (uid, _) ->
+                    if (!gameServers.any { UUID.fromString(it.metadata.uid) == uid }) {
+                        val server = proxyServer.getServer(uid.toString()).getOrNull()?.serverInfo
+                        proxyServer.unregisterServer(server ?: return@forEach)
+                        logger.info("Game server with uid $uid does not exist anymore and has been unregistered.")
+                    }
+                }
+            }.onFailure {
+                logger.severe("Error updating registered servers with Agones: ${it::class.java.name}")
+                it.printStackTrace()
+            }
+        }
+    }
+
+    private fun startAMQPConnection() {
+        timer("amqp-connection-test", daemon = false, period = 5_000) {
+            // Check if RabbitMQ is ready for requests
+            try {
+                // Check if the port is open first; this is faster and doesn't require the creation of a whole client
+                Socket("rabbitmq", 5672).close()
+                // Create a client to verify that RabbitMQ is fully started and running on this port
+                AMQPClient(connectionName = "Komodo Connection Test{${System.currentTimeMillis()}}",
+                    polymorphicModuleBuilder = {}).close()
+                logger.info("RabbitMQ started successfully! Initializing messaging support.")
+            } catch (ignored: Throwable) {
+                logger.fine("Waiting 5 seconds to retry connection to RabbitMQ.")
+                return@timer
+            }
+            subscribeAll()
+            this.cancel()
+        }
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun subscribeAll() {
         client = AMQPClient(polymorphicModuleBuilder = polymorphicModuleBuilder)
         client.subscribe(NotifyInstanceCreatedMessage::class) { message ->
             instanceMap.getOrPut(message.containerId) { mutableListOf() }.add(message.instanceId)
@@ -92,44 +146,6 @@ class Komodo {
             val newLobbies = message.instances.filter { it.type?.name == LOBBY_GAME_NAME }.map { it.instanceId }
             lobbies.addAll(newLobbies)
         }
-        timer("agones-update", daemon = true, period = 5_000) {
-            runCatching {
-                val gameServers = serviceDiscovery.listServices()
-                gameServers.forEach {
-
-                    val status = it.raw.getAsJsonObject("status")
-                    val address = status.get("address").asString
-                    val port = status.get("ports").asJsonArray.first { p ->
-                        p.asJsonObject.get("name").asString == "minecraft"
-                    }.asJsonObject.get("port").asInt
-
-                    val uid = UUID.fromString(it.metadata.uid)
-                    if (!instanceMap.containsKey(uid)) {
-                        logger.info("New game server created with UID: $uid")
-                        instanceMap[uid] = mutableListOf()
-                        proxyServer.registerServer(
-                            ServerInfo(
-                                it.metadata.uid,
-                                InetSocketAddress(
-                                    address,
-                                    port
-                                )
-                            )
-                        )
-                    }
-                }
-                instanceMap.forEach { (uid, _) ->
-                    if (!gameServers.any { UUID.fromString(it.metadata.uid) == uid }) {
-                        val server = proxyServer.getServer(uid.toString()).getOrNull()?.serverInfo
-                        proxyServer.unregisterServer(server ?: return@forEach)
-                        logger.info("Game server with uid $uid does not exist anymore and has been unregistered.")
-                    }
-                }
-            }.onFailure {
-                logger.severe("Error updating registered servers with Agones: ${it::class.java.name}")
-                it.printStackTrace()
-            }
-        }
     }
 
     /**
@@ -140,11 +156,9 @@ class Komodo {
      */
     private val callServerListPing by lazy {
         val velocityRegisteredServerClass = Class.forName("com.velocitypowered.proxy.server.VelocityRegisteredServer")
-        val ping = velocityRegisteredServerClass.getDeclaredMethod(
-            "ping",
+        val ping = velocityRegisteredServerClass.getDeclaredMethod("ping",
             Class.forName("io.netty.channel.EventLoop"),
-            ProtocolVersion::class.java
-        )
+            ProtocolVersion::class.java)
 
         return@lazy { rs: RegisteredServer, version: ProtocolVersion ->
             ping.invoke(velocityRegisteredServerClass.cast(rs), null, version) as CompletableFuture<ServerPing>
@@ -170,22 +184,14 @@ class Komodo {
         }.maxByOrNull { it.playersConnected.size }
         if (registeredServer != null) {
             event.setInitialServer(registeredServer)
-            client.publish(
-                SendPlayerToInstanceMessage(
-                    event.player.uniqueId,
-                    getLobby(registeredServer.serverInfo.name)!!
-                ).also { ownMessages.add(it) }
-            )
+            client.publish(SendPlayerToInstanceMessage(event.player.uniqueId,
+                getLobby(registeredServer.serverInfo.name)!!).also { ownMessages.add(it) })
             return
         }
 
         logger.warning("No lobby found for ${event.player} to join!")
-        event.player.disconnect(
-            Component.text(
-                "No lobby was found for you to join! Try rejoining in a few minutes.",
-                NamedTextColor.RED
-            )
-        )
+        event.player.disconnect(Component.text("No lobby was found for you to join! Try rejoining in a few minutes.",
+            NamedTextColor.RED))
     }
 
     private fun getLobby(serverName: String): UUID? =
