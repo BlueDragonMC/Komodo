@@ -1,10 +1,8 @@
 # syntax = docker/dockerfile:1
-# This Dockerfile runs on the CI/CD pipeline when the Server is being deployed.
-# It is much slower because `RUN mount=type=cache` is not supported by BuildKit,
-# Buildah, or Kaniko in a Kubernetes cluster (docker-in-docker environment)
+# This Dockerfile runs on the CI/CD pipeline when Komodo is being deployed.
 
 # Build the project into an executable JAR
-FROM gradle:jdk17 as build
+FROM docker.io/library/gradle:7.4.2-jdk17-alpine as build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
@@ -12,20 +10,13 @@ WORKDIR /work
 RUN /usr/bin/gradle --console=rich --warn --stacktrace --no-daemon build
 
 # Run Velocity with the built JAR in its plugins folder and expose port 25565
-FROM eclipse-temurin:17
+FROM docker.io/library/eclipse-temurin:17-jre-alpine
 
 EXPOSE 25565
 
 ARG VELOCITY_VERSION="3.1.2-SNAPSHOT"
 ARG VELOCITY_BUILD_NUMBER=162
 ARG REALIP_VERSION="2.6.0"
-ARG MC_MONITOR_VERSION="0.10.6"
-
-# Add mc-monitor for container healthchecks
-ADD https://github.com/itzg/mc-monitor/releases/download/$MC_MONITOR_VERSION/mc-monitor_${MC_MONITOR_VERSION}_linux_amd64.tar.gz /tmp/mc-monitor.tgz
-RUN tar -xf /tmp/mc-monitor.tgz -C /usr/local/bin mc-monitor && rm /tmp/mc-monitor.tgz
-
-HEALTHCHECK --start-period=10s --interval=5s --retries=4 CMD sh /proxy/health.sh
 
 WORKDIR /proxy
 # Add Velocity using the version specified in the build arg
