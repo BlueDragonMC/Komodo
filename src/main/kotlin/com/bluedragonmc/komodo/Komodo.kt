@@ -58,8 +58,8 @@ class Komodo {
                 val gameServers = serviceDiscovery.listServices().filter { it.isReady() }
                 gameServers.forEach {
 
-                    val address = it.getAddress()
-                    val port = it.getContainerPort() ?: return@forEach
+                    val address = it.getHostAddress()
+                    val port = it.getHostPort() ?: return@forEach
                     val uid = UUID.fromString(it.uid)
 
                     if (!instanceMap.containsKey(uid) || proxyServer.getServer(it.uid).isEmpty) {
