@@ -47,14 +47,15 @@ class ServiceDiscovery {
         private val name = agonesServer.metadata.name
 
         fun isReady(): Boolean =
-            getAddress() != null && getContainerPort() != null && pod.status?.containerStatuses?.all { it.ready } == true
+            getPodAddress() != null && getContainerPort() != null && pod.status?.containerStatuses?.all { it.ready } == true
 
-        internal fun getAddress(): String? = pod.status?.podIP
+        internal fun getPodAddress(): String? = pod.status?.podIP
+        internal fun getHostAddress(): String? = agonesServer.raw?.getAsJsonObject("status")?.get("address")?.asString
 
         /**
          * Get the host port of this game server (exposed by Agones)
          */
-        private fun getHostPort(): Int? {
+        internal fun getHostPort(): Int? {
             val status = agonesServer.raw.getAsJsonObject("status")
             if (status?.get("ports")?.isJsonArray != true) return null
             return status.get("ports")!!.asJsonArray.firstOrNull { p ->
@@ -81,7 +82,7 @@ class ServiceDiscovery {
         private fun getState() = agonesServer.raw.get("status").asJsonObject.get("state").asString
 
         override fun toString(): String {
-            return "GameServer(uid=$uid, name=$name, state=${getState()}, clusterIP=${getAddress()}, hostPort=${getHostPort()}, containerPort=${getContainerPort()})"
+            return "GameServer(uid=$uid, name=$name, state=${getState()}, clusterIP=${getPodAddress()}, hostPort=${getHostPort()}, containerPort=${getContainerPort()})"
         }
     }
 }
