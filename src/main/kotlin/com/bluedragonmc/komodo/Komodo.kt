@@ -55,25 +55,21 @@ class Komodo {
         startAMQPConnection()
         timer("agones-update", daemon = true, period = 5_000) {
             runCatching {
-                val gameServers = serviceDiscovery.listServices()
+                val gameServers = serviceDiscovery.listServices().filter { it.isReady() }
                 gameServers.forEach {
 
-                    val status = it.raw.getAsJsonObject("status") ?: return@forEach
-                    val address = status.get("address").asString ?: return@forEach
-                    if (!status.has("ports") || !status.get("ports").isJsonArray) return@forEach
-                    val port = status.get("ports")?.asJsonArray?.firstOrNull { p ->
-                        p.asJsonObject.get("name").asString == "minecraft"
-                    }?.asJsonObject?.get("port")?.asInt ?: return@forEach
+                    val address = it.getAddress()
+                    val port = it.getContainerPort() ?: return@forEach
+                    val uid = UUID.fromString(it.uid)
 
-                    val uid = UUID.fromString(it.metadata.uid)
-                    if (!instanceMap.containsKey(uid)) {
+                    if (!instanceMap.containsKey(uid) || proxyServer.getServer(it.uid).isEmpty) {
                         logger.info("New game server created with UID: $uid")
                         instanceMap[uid] = mutableListOf()
-                        proxyServer.registerServer(ServerInfo(it.metadata.uid, InetSocketAddress(address, port)))
+                        proxyServer.registerServer(ServerInfo(it.uid, InetSocketAddress(address, port)))
                     }
                 }
                 instanceMap.forEach { (uid, _) ->
-                    if (!gameServers.any { UUID.fromString(it.metadata.uid) == uid }) {
+                    if (!gameServers.any { UUID.fromString(it.uid) == uid }) {
                         val server = proxyServer.getServer(uid.toString()).getOrNull()?.serverInfo
                         proxyServer.unregisterServer(server ?: return@forEach)
                         logger.info("Game server with uid $uid does not exist anymore and has been unregistered.")
@@ -169,10 +165,13 @@ class Komodo {
     fun onServerListPing(event: ProxyPingEvent) {
         // When a client calls a server list ping, forward a ping from a backend server.
         proxyServer.allServers.forEach {
-            val ping = callServerListPing(it, event.connection.protocolVersion).get(1, TimeUnit.SECONDS)
-            event.ping = ping.asBuilder().onlinePlayers(proxyServer.allPlayers.size)
-                .maximumPlayers(proxyServer.configuration.showMaxPlayers).build()
-            return
+            try {
+                val ping = callServerListPing(it, event.connection.protocolVersion).get(1, TimeUnit.SECONDS)
+                event.ping = ping.asBuilder().onlinePlayers(proxyServer.allPlayers.size)
+                    .maximumPlayers(proxyServer.configuration.showMaxPlayers).build()
+                return
+            } catch (ignored: Throwable) {
+            }
         }
     }
 
