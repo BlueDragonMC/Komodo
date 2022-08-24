@@ -5,6 +5,8 @@ import com.bluedragonmc.messagingsystem.AMQPClient
 import com.bluedragonmc.messagingsystem.message.Message
 import com.google.inject.Inject
 import com.velocitypowered.api.event.Subscribe
+import com.velocitypowered.api.event.connection.DisconnectEvent
+import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
@@ -193,6 +195,24 @@ class Komodo {
             NamedTextColor.RED))
     }
 
+    @Subscribe
+    fun onPlayerLeave(event: DisconnectEvent) {
+        client.publish(PlayerLogoutMessage(event.player.uniqueId))
+    }
+
+    @Subscribe
+    fun onPlayerKick(event: KickedFromServerEvent) {
+        if (event.kickedDuringServerConnect()) return
+
+        val registeredServer = proxyServer.allServers.filter { registeredServer ->
+            // Find a lobby on a different server than the one that kicked the player
+            registeredServer.serverInfo != event.server.serverInfo && getLobby(registeredServer.serverInfo.name) != null
+        }.maxByOrNull { it.playersConnected.size }
+        val msg = Component.text("You were kicked from ${event.server.serverInfo.name}: ", NamedTextColor.RED)
+            .append(event.serverKickReason.orElse(Component.text("No reason specified", NamedTextColor.DARK_GRAY)))
+        event.result = KickedFromServerEvent.RedirectPlayer.create(registeredServer, msg)
+    }
+
     private fun getLobby(serverName: String): UUID? =
         instanceMap[UUID.fromString(serverName)]?.firstOrNull { lobbies.contains(it) }
 
@@ -205,7 +225,10 @@ class Komodo {
 
     @Subscribe
     fun onStop(event: ProxyShutdownEvent) {
-
+        for (player in proxyServer.allPlayers) {
+            client.publish(PlayerLogoutMessage(player.uniqueId))
+        }
+        client.close()
     }
 
     companion object {
