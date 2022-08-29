@@ -210,7 +210,11 @@ class Komodo {
         }.maxByOrNull { it.playersConnected.size }
         val msg = Component.text("You were kicked from ${event.server.serverInfo.name}: ", NamedTextColor.RED)
             .append(event.serverKickReason.orElse(Component.text("No reason specified", NamedTextColor.DARK_GRAY)))
-        event.result = KickedFromServerEvent.RedirectPlayer.create(registeredServer, msg)
+        if (registeredServer != null) {
+            event.result = KickedFromServerEvent.RedirectPlayer.create(registeredServer, msg)
+        } else {
+            event.result = KickedFromServerEvent.DisconnectPlayer.create(msg)
+        }
     }
 
     private fun getLobby(serverName: String): UUID? =
