@@ -13,6 +13,7 @@ import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.network.ProtocolVersion
 import com.velocitypowered.api.plugin.Plugin
+import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
@@ -50,6 +51,8 @@ class Komodo {
     private val ownMessages = mutableListOf<Message>()
 
     private val serviceDiscovery = ServiceDiscovery()
+
+    private val lastFailover = mutableMapOf<Player, Long>()
 
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
@@ -197,12 +200,16 @@ class Komodo {
 
     @Subscribe
     fun onPlayerLeave(event: DisconnectEvent) {
+        lastFailover.remove(event.player)
         client.publish(PlayerLogoutMessage(event.player.uniqueId))
     }
 
     @Subscribe
     fun onPlayerKick(event: KickedFromServerEvent) {
-        if (event.kickedDuringServerConnect()) return
+        if (event.kickedDuringServerConnect() || ((lastFailover[event.player] ?: 0L) + 10000 > System.currentTimeMillis()))
+            return
+
+        lastFailover[event.player] = System.currentTimeMillis()
 
         val registeredServer = proxyServer.allServers.filter { registeredServer ->
             // Find a lobby on a different server than the one that kicked the player
