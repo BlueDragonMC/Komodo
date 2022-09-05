@@ -15,14 +15,17 @@ FROM docker.io/library/eclipse-temurin:17-jre-alpine
 EXPOSE 25565
 
 ARG VELOCITY_VERSION="3.1.2-SNAPSHOT"
-ARG VELOCITY_BUILD_NUMBER=162
+ARG VELOCITY_BUILD_NUMBER=179
 ARG REALIP_VERSION="2.6.0"
+ARG VIA_VERSION="4.4.2"
 
 WORKDIR /proxy
 # Add Velocity using the version specified in the build arg
 ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/builds/$VELOCITY_BUILD_NUMBER/downloads/velocity-$VELOCITY_VERSION-$VELOCITY_BUILD_NUMBER.jar" /proxy/proxy.jar
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
+# Add ViaVersion to allow newer clients to connect
+ADD "https://github.com/ViaVersion/ViaVersion/releases/download/$VIA_VERSION/ViaVersion-${VIA_VERSION}.jar" /proxy/plugins/ViaVersion-$VIA_VERSION.jar
 COPY --from=build /work/build/libs/Komodo-*.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
 CMD ["sh", "/proxy/entrypoint.sh"]

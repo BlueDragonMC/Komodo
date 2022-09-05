@@ -173,7 +173,9 @@ class Komodo {
             try {
                 val ping = callServerListPing(it, event.connection.protocolVersion).get(1, TimeUnit.SECONDS)
                 event.ping = ping.asBuilder().onlinePlayers(proxyServer.allPlayers.size)
-                    .maximumPlayers(proxyServer.configuration.showMaxPlayers).build()
+                    .maximumPlayers(proxyServer.configuration.showMaxPlayers)
+                    .version(event.ping.version)
+                    .build()
                 return
             } catch (ignored: Throwable) {
             }
