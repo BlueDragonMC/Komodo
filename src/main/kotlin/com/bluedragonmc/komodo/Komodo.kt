@@ -2,12 +2,15 @@ package com.bluedragonmc.komodo
 
 import com.bluedragonmc.messages.*
 import com.bluedragonmc.messagingsystem.AMQPClient
-import com.bluedragonmc.messagingsystem.message.Message
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.inject.Inject
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
+import com.velocitypowered.api.event.player.ServerLoginPluginMessageEvent
+import com.velocitypowered.api.event.player.ServerPreConnectEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
@@ -22,6 +25,8 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.nio.ByteBuffer
+import java.time.Duration
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -48,11 +53,15 @@ class Komodo {
     private val instanceMap = mutableMapOf<UUID, MutableList<UUID>>()
     private val lobbies = mutableSetOf<UUID>()
 
-    private val ownMessages = mutableListOf<Message>()
-
     private val serviceDiscovery = ServiceDiscovery()
 
     private val lastFailover = mutableMapOf<Player, Long>()
+
+    private val instanceDestinations: Cache<Player, String> = Caffeine.newBuilder()
+        .expireAfterWrite(Duration.ofSeconds(30))
+        .expireAfterAccess(Duration.ofSeconds(5))
+        .weakKeys()
+        .build()
 
     @OptIn(ExperimentalStdlibApi::class)
     @Subscribe
@@ -117,10 +126,6 @@ class Komodo {
             }
         }
         client.subscribe(SendPlayerToInstanceMessage::class) { message ->
-            if (ownMessages.contains(message)) { // If this message was sent by Komodo there is no reason to handle it.
-                ownMessages.remove(message)
-                return@subscribe
-            }
             val player = proxyServer.getPlayer(message.player).getOrNull() ?: return@subscribe
             val registeredServer =
                 getContainerId(message.instance)?.let { proxyServer.getServer(it).getOrNull() } ?: run {
@@ -130,12 +135,13 @@ class Komodo {
             // Don't try to send a player to their current server
             if (player.currentServer.getOrNull()?.serverInfo?.name == registeredServer.serverInfo.name) return@subscribe
             try {
+                instanceDestinations.put(player, message.instance.toString())
                 player.createConnectionRequest(registeredServer).fireAndForget()
             } catch (e: Throwable) {
                 logger.warning("Error sending player ${player.username} to server $registeredServer!")
                 e.printStackTrace()
             }
-            logger.info("Sending player $player to server $registeredServer")
+            logger.info("Sending player $player to server $registeredServer and instance ${message.instance}")
         }
         client.subscribe(ServerSyncMessage::class) { message ->
             // Every 30 seconds, this message is sent from each Minestom server.
@@ -155,6 +161,7 @@ class Komodo {
      * `ProtocolVersion.UNKNOWN` by default. We want to change this default and specify the client's
      * protocol version.
      */
+    @Suppress("UNCHECKED_CAST")
     private val callServerListPing by lazy {
         val velocityRegisteredServerClass = Class.forName("com.velocitypowered.proxy.server.VelocityRegisteredServer")
         val ping = velocityRegisteredServerClass.getDeclaredMethod("ping",
@@ -183,6 +190,47 @@ class Komodo {
     }
 
     @Subscribe
+    fun onLoginPluginMessage(event: ServerLoginPluginMessageEvent) {
+        if (event.identifier.id == "bluedragonmc:get_dest") {
+            // Get the player's cached destination
+            val instanceName = instanceDestinations.getIfPresent(event.connection.player) ?: return
+            val uid = UUID.fromString(instanceName)
+            val buf = ByteBuffer.allocate(16)
+            // Write the instance UUID to the byte buffer
+            buf.putLong(uid.mostSignificantBits)
+            buf.putLong(uid.leastSignificantBits)
+            buf.rewind()
+            // Convert the buffer into a byte array to be sent to the backend server
+            val bytes = ByteArray(buf.remaining())
+            buf.get(bytes)
+            // Reply to the request with these bytes
+            event.result = ServerLoginPluginMessageEvent.ResponseResult.reply(bytes)
+            logger.info("Sending player ${event.connection.player.username} to instance '$instanceName' on server '${event.connection.serverInfo.name}'")
+        } else if (event.identifier.id.startsWith("bluedragonmc:")) {
+            logger.warning("Login plugin message sent on unexpected channel: '${event.identifier.id}'")
+            event.result = ServerLoginPluginMessageEvent.ResponseResult.unknown()
+        }
+    }
+
+    @Subscribe
+    fun onServerConnect(event: ServerPreConnectEvent) {
+        instanceDestinations.get(event.player) {
+            // If there is no destination instance specified,
+            // a lobby on that server should be used.
+            if (event.originalServer != null) {
+                if (event.result.server.isPresent) {
+                    val lobby = getLobby(event.result.server.get().serverInfo.name)
+                    if (lobby == null) {
+                        event.result = ServerPreConnectEvent.ServerResult.denied()
+                    }
+                    return@get lobby?.toString()
+                }
+            }
+            return@get null
+        }
+    }
+
+    @Subscribe
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
         // When a player joins, send them to the lobby with the most players
         val registeredServer = proxyServer.allServers.filter { registeredServer ->
@@ -190,8 +238,9 @@ class Komodo {
         }.maxByOrNull { it.playersConnected.size }
         if (registeredServer != null) {
             event.setInitialServer(registeredServer)
-            client.publish(SendPlayerToInstanceMessage(event.player.uniqueId,
-                getLobby(registeredServer.serverInfo.name)!!).also { ownMessages.add(it) })
+            val lobby = getLobby(registeredServer.serverInfo.name)!!
+            instanceDestinations.put(event.player, lobby.toString())
+            logger.fine("Player ${event.player.username} will be sent to instance '$lobby' on server '${registeredServer.serverInfo.name}'")
             return
         }
 

@@ -17,7 +17,8 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.github.bluedragonmc:messagingsystem:3abc4b8a49")
     implementation("com.github.bluedragonmc:messages:23a6e3bfc8")
-    compileOnly("com.velocitypowered:velocity-api:3.0.1")
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.1")
+    compileOnly("com.velocitypowered:velocity-api:3.1.1")
     implementation("io.kubernetes:client-java:16.0.0")
     kapt("com.velocitypowered:velocity-api:3.0.1")
 }
