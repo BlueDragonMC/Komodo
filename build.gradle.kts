@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "1.7.10"
     kotlin("kapt") version "1.7.10"
-    id("com.github.johnrengelman.shadow") version "4.0.0"
+    id("com.github.johnrengelman.shadow") version "7.0.0"
 }
 
 rootProject.group = "com.bluedragonmc"
@@ -26,11 +26,15 @@ dependencies {
     kapt("com.velocitypowered:velocity-api:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
-    runtimeOnly("io.grpc:grpc-netty:$grpcVersion")
-    implementation("io.grpc:grpc-stub:$grpcVersion")
+    implementation("io.grpc:grpc-netty:$grpcVersion")
+    implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.bluedragonmc:rpc:1.0")
+    implementation("com.github.bluedragonmc:rpc:605f302179")
+}
+
+tasks.shadowJar {
+    mergeServiceFiles()
 }
 
 tasks["build"].dependsOn(tasks["shadowJar"])

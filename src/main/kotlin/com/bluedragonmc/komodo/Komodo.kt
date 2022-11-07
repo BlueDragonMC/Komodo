@@ -25,6 +25,8 @@ import io.grpc.ServerBuilder
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import org.slf4j.LoggerFactory
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.time.Duration
@@ -52,8 +54,16 @@ class Komodo {
     lateinit var proxyServer: ProxyServer
 
     object Stubs {
+
+        private val logger = LoggerFactory.getLogger(this::class.java)
+
         private val channel by lazy {
-            ManagedChannelBuilder.forAddress("localhost", 50051).usePlaintext().build()
+            val addr = InetAddress.getByName("puffin").hostAddress
+            logger.info("Initializing gRPC channel - Connecting to puffin (resolves to ${addr})")
+            ManagedChannelBuilder.forAddress("puffin", 50051)
+                .defaultLoadBalancingPolicy("round_robin")
+                .usePlaintext()
+                .build()
         }
 
         val discovery by lazy {
@@ -62,6 +72,10 @@ class Komodo {
 
         val playerTracking by lazy {
             PlayerTrackerGrpcKt.PlayerTrackerCoroutineStub(channel)
+        }
+
+        fun preInitialize() {
+            channel
         }
     }
 
@@ -77,6 +91,9 @@ class Komodo {
     fun onInit(event: ProxyInitializeEvent) {
         val server = ServerBuilder.forPort(50051).addService(PlayerHolderService()).build()
         server.start()
+
+        // Pre-initialize gRPC channel
+        Stubs.preInitialize()
     }
 
     inner class PlayerHolderService : PlayerHolderGrpcKt.PlayerHolderCoroutineImplBase() {
@@ -195,10 +212,19 @@ class Komodo {
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
         // When a player joins, send them to the lobby with the most players
         val (registeredServer, lobbyInstance) = getLobby()
-        if (registeredServer != null && lobbyInstance != null) {
+        if (registeredServer != null && !lobbyInstance.isNullOrEmpty()) {
             event.setInitialServer(registeredServer)
             instanceDestinations.put(event.player, lobbyInstance)
-            logger.fine("Player ${event.player.username} will be sent to instance '$lobbyInstance' on server '${registeredServer.serverInfo.name}'")
+            logger.info("Routing player ${event.player.username} to instance '$lobbyInstance' on server '${registeredServer.serverInfo.name}'.")
+
+            runBlocking {
+                Stubs.playerTracking.playerLogin(playerLoginRequest {
+                    username = event.player.username
+                    uuid = event.player.uniqueId.toString()
+                    proxyPodName = System.getenv("HOSTNAME")
+                })
+            }
+
             return
         }
 
@@ -251,6 +277,9 @@ class Komodo {
                 if(excluding != null)
                     this.excludeServerNames += excluding
             })
+
+            if (!response.found) return@runBlocking null to null // :( no lobby was found
+
             return@runBlocking proxyServer.getServer(response.serverName).getOrElse {
                 proxyServer.registerServer(
                     ServerInfo(response.serverName, InetSocketAddress(response.ip, response.port))
