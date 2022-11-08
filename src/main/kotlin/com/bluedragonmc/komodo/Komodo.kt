@@ -9,6 +9,7 @@ import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.player.ServerLoginPluginMessageEvent
+import com.velocitypowered.api.event.player.ServerPostConnectEvent
 import com.velocitypowered.api.event.player.ServerPreConnectEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
@@ -37,6 +38,7 @@ import java.util.logging.Logger
 import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 
+@OptIn(ExperimentalStdlibApi::class)
 @Plugin(
     id = "komodo",
     name = "Komodo",
@@ -102,7 +104,12 @@ class Komodo {
 
             val uuid = UUID.fromString(request.playerUuid)
             val player = proxyServer.getPlayer(uuid).getOrNull()
-            val registeredServer = proxyServer.getServer(request.serverName).getOrNull()
+            val registeredServer = proxyServer.getServer(request.serverName).getOrNull() ?: run {
+                logger.info("Registering server ${request.serverName} at ${request.gameServerIp}:${request.gameServerPort} to send player $player to it.")
+                proxyServer.registerServer(
+                    ServerInfo(request.serverName, InetSocketAddress(request.gameServerIp, request.gameServerPort))
+                )
+            }
             // Don't try to send a player to their current server
             if (player == null || registeredServer == null) {
                 return sendPlayerResponse {
@@ -209,6 +216,14 @@ class Komodo {
     }
 
     @Subscribe
+    fun onServerPostConnect(event: ServerPostConnectEvent) {
+        if (event.previousServer?.playersConnected?.isEmpty() == true) {
+            logger.info("Unregistering server ${event.previousServer?.serverInfo?.name} because its last player was sent to another server.")
+            proxyServer.unregisterServer(event.previousServer!!.serverInfo)
+        }
+    }
+
+    @Subscribe
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
         // When a player joins, send them to the lobby with the most players
         val (registeredServer, lobbyInstance) = getLobby()
@@ -246,6 +261,12 @@ class Komodo {
                 uuid = event.player.uniqueId.toString()
             })
         }
+
+        val server = event.player.currentServer.getOrNull()?.server
+        if (server?.playersConnected?.isEmpty() == true) {
+            logger.info("Unregistering server $server because its last player logged out.")
+            proxyServer.unregisterServer(server.serverInfo)
+        }
     }
 
     @Subscribe
@@ -268,7 +289,6 @@ class Komodo {
         }
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     private fun getLobby(serverName: String? = null, excluding: String? = null): Pair<RegisteredServer?, String?> =
         runBlocking {
             val response = Stubs.discovery.findLobby(findLobbyRequest {
@@ -281,6 +301,7 @@ class Komodo {
             if (!response.found) return@runBlocking null to null // :( no lobby was found
 
             return@runBlocking proxyServer.getServer(response.serverName).getOrElse {
+                logger.info("Registering server ${response.serverName} at address ${response.ip}:${response.port}")
                 proxyServer.registerServer(
                     ServerInfo(response.serverName, InetSocketAddress(response.ip, response.port))
                 )
