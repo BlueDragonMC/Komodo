@@ -22,7 +22,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.1")
     compileOnly("com.velocitypowered:velocity-api:3.1.1")
-    implementation("io.kubernetes:client-java:16.0.1")
+    implementation("net.kyori:adventure-text-minimessage:4.11.0")
     kapt("com.velocitypowered:velocity-api:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
@@ -30,7 +30,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:4420a7d1bc")
+    implementation("com.github.bluedragonmc:rpc:c2785493d9")
 }
 
 tasks.shadowJar {

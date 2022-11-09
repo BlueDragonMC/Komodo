@@ -60,9 +60,9 @@ bungee-servers: {}
 #
 # What interval would you like us to ping at? (in seconds)
 # Use -1 to disable.
-velocity-ping-interval: -1
+velocity-ping-interval: 3
 # If the above is enabled, should we save the info to the config (in the section below)
-velocity-ping-save: false
+velocity-ping-save: true
 # To get a servers protocol, ViaVersion will do the following:
 # Look for the server in the following section, then look for the last ping if velocity-ping is enabled
 # otherwise use default.

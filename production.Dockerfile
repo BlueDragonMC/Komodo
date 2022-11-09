@@ -25,7 +25,7 @@ ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/buil
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
 # Add ViaVersion to allow newer clients to connect
-ADD "https://github.com/ViaVersion/ViaVersion/releases/download/$VIA_VERSION/ViaVersion-${VIA_VERSION}.jar" /proxy/plugins/ViaVersion-$VIA_VERSION.jar
+#ADD "https://github.com/ViaVersion/ViaVersion/releases/download/$VIA_VERSION/ViaVersion-${VIA_VERSION}.jar" /proxy/plugins/ViaVersion-$VIA_VERSION.jar
 COPY --from=build /work/build/libs/Komodo-*-all.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
 CMD ["sh", "/proxy/entrypoint.sh"]
