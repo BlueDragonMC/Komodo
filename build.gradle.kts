@@ -30,7 +30,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:840fc82b44")
+    implementation("com.github.bluedragonmc:rpc:4420a7d1bc")
 }
 
 tasks.shadowJar {
