@@ -104,7 +104,7 @@ compression-level = -1
 
 # How fast (in milliseconds) are clients allowed to connect after the last connection? By
 # default, this is three seconds. Disable this by setting this to 0.
-login-ratelimit = 3000
+login-ratelimit = 1000
 
 # Specify a custom timeout for connection timeouts here. The default is five seconds.
 connection-timeout = 5000

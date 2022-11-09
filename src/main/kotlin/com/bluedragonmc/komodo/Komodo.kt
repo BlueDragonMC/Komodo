@@ -1,9 +1,11 @@
 package com.bluedragonmc.komodo
 
 import com.bluedragonmc.api.grpc.*
+import com.bluedragonmc.api.grpc.GetPlayersResponseKt.connectedPlayer
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.inject.Inject
+import com.google.protobuf.Empty
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
@@ -136,6 +138,20 @@ class Komodo {
                 successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_INSTANCE
             }
         }
+
+        override suspend fun getPlayers(request: Empty): PlayerHolderOuterClass.GetPlayersResponse {
+            return getPlayersResponse {
+                proxyServer.allPlayers.forEach { player ->
+                    this.players += connectedPlayer {
+                        this.uuid = player.uniqueId.toString()
+                        this.username = player.username
+                        if (player.currentServer.isPresent) {
+                            this.serverName = player.currentServer.get().serverInfo.name
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -158,6 +174,9 @@ class Komodo {
         }
     }
 
+    // If the proxy has no registered servers, it will use a MOTD from the last time it had one registered.
+    private var lastPing: ServerPing? = null
+
     @Subscribe
     fun onServerListPing(event: ProxyPingEvent) {
         // When a client calls a server list ping, forward a ping from a backend server.
@@ -168,9 +187,14 @@ class Komodo {
                     .maximumPlayers(proxyServer.configuration.showMaxPlayers)
                     .version(event.ping.version)
                     .build()
+                lastPing = ping
                 return
             } catch (ignored: Throwable) {
             }
+        }
+
+        if (lastPing != null) {
+            event.ping = lastPing!!.asBuilder().onlinePlayers(proxyServer.playerCount).build()
         }
     }
 
