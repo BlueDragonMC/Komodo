@@ -15,15 +15,18 @@ import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
+import io.grpc.Server
 import io.grpc.ServerBuilder
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import java.net.InetSocketAddress
 import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
 import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
+import kotlin.system.exitProcess
 
 @OptIn(ExperimentalStdlibApi::class)
 @Plugin(
@@ -46,22 +49,32 @@ class Komodo {
 
     private val instanceRoutingHandler = InstanceRoutingHandler()
 
+    private lateinit var server: Server
+
     companion object {
         lateinit var INSTANCE: Komodo
     }
 
     @Subscribe
     fun onInit(event: ProxyInitializeEvent) {
-        INSTANCE = this
-        val server = ServerBuilder.forPort(50051).addService(PlayerHolderService()).build()
-        server.start()
+        try {
+            INSTANCE = this
+            server = ServerBuilder.forPort(50051).addService(PlayerHolderService()).build()
+            server.start()
 
-        // Pre-initialize gRPC channel
-        Stubs.preInitialize()
+            // Initialize gRPC channel to Puffin
+            runBlocking {
+                Stubs.initialize()
+            }
 
-        // Subscribe to events
-        proxyServer.eventManager.register(this, ServerListPingHandler())
-        proxyServer.eventManager.register(this, instanceRoutingHandler)
+            // Subscribe to events
+            proxyServer.eventManager.register(this, ServerListPingHandler())
+            proxyServer.eventManager.register(this, instanceRoutingHandler)
+        } catch (e: Throwable) {
+            logger.severe("There was an error initializing Komodo.")
+            e.printStackTrace()
+            exitProcess(1)
+        }
     }
 
     inner class PlayerHolderService : PlayerHolderGrpcKt.PlayerHolderCoroutineImplBase() {
@@ -184,6 +197,10 @@ class Komodo {
 
     @Subscribe
     fun onStop(event: ProxyShutdownEvent) {
+        if (::server.isInitialized && !server.isShutdown) {
+            server.shutdown()
+            server.awaitTermination(10, TimeUnit.SECONDS)
+        }
         for (player in proxyServer.allPlayers) {
             runBlocking {
                 Stubs.playerTracking.playerLogout(playerLogoutRequest {
