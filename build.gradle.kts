@@ -16,7 +16,7 @@ repositories {
 
 val grpcKotlinVersion = "1.3.0"
 val protoVersion = "3.21.9"
-val grpcVersion = "1.50.2"
+val grpcVersion = "1.51.0"
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")

@@ -8,6 +8,7 @@ import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 object Stubs {
@@ -54,5 +55,10 @@ object Stubs {
                 delay(2_000)
             }
         }
+    }
+
+    fun shutdown() {
+        channel.shutdown()
+        channel.awaitTermination(10, TimeUnit.SECONDS)
     }
 }

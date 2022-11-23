@@ -197,10 +197,6 @@ class Komodo {
 
     @Subscribe
     fun onStop(event: ProxyShutdownEvent) {
-        if (::server.isInitialized && !server.isShutdown) {
-            server.shutdown()
-            server.awaitTermination(10, TimeUnit.SECONDS)
-        }
         for (player in proxyServer.allPlayers) {
             runBlocking {
                 Stubs.playerTracking.playerLogout(playerLogoutRequest {
@@ -209,5 +205,10 @@ class Komodo {
                 })
             }
         }
+        if (::server.isInitialized && !server.isShutdown) {
+            server.shutdown()
+            server.awaitTermination(10, TimeUnit.SECONDS)
+        }
+        Stubs.shutdown()
     }
 }
