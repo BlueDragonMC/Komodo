@@ -23,6 +23,7 @@ object Stubs {
         return ManagedChannelBuilder.forAddress("puffin", 50051)
             .defaultLoadBalancingPolicy("round_robin")
             .usePlaintext()
+            .enableRetry()
             .build()
     }
 
