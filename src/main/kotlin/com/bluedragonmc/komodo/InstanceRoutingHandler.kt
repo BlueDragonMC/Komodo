@@ -12,15 +12,13 @@ import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.slf4j.LoggerFactory
-import java.nio.ByteBuffer
 import java.time.Duration
-import java.util.*
 
 class InstanceRoutingHandler {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    private val instanceDestinations: Cache<Player, String> = Caffeine.newBuilder()
+    private val gameDestinations: Cache<Player, String> = Caffeine.newBuilder()
         .expireAfterWrite(Duration.ofSeconds(30))
         .expireAfterAccess(Duration.ofSeconds(5))
         .weakKeys()
@@ -30,19 +28,12 @@ class InstanceRoutingHandler {
     fun onLoginPluginMessage(event: ServerLoginPluginMessageEvent) {
         if (event.identifier.id == "bluedragonmc:get_dest") {
             // Get the player's cached destination
-            val instanceName = instanceDestinations.getIfPresent(event.connection.player) ?: return
-            val uid = UUID.fromString(instanceName)
-            val buf = ByteBuffer.allocate(16)
-            // Write the instance UUID to the byte buffer
-            buf.putLong(uid.mostSignificantBits)
-            buf.putLong(uid.leastSignificantBits)
-            buf.rewind()
-            // Convert the buffer into a byte array to be sent to the backend server
-            val bytes = ByteArray(buf.remaining())
-            buf.get(bytes)
+            val gameId = gameDestinations.getIfPresent(event.connection.player) ?: return
+            // Convert the game ID to a byte array
+            val bytes = gameId.toByteArray()
             // Reply to the request with these bytes
             event.result = ServerLoginPluginMessageEvent.ResponseResult.reply(bytes)
-            logger.info("Sending player ${event.connection.player.username} to instance '$instanceName' on server '${event.connection.serverInfo.name}'")
+            logger.info("Sending player ${event.connection.player.username} to instance '$gameId' on server '${event.connection.serverInfo.name}'")
         } else if (event.identifier.id.startsWith("bluedragonmc:")) {
             logger.warn("Login plugin message sent on unexpected channel: '${event.identifier.id}'")
             event.result = ServerLoginPluginMessageEvent.ResponseResult.unknown()
@@ -51,7 +42,7 @@ class InstanceRoutingHandler {
 
     @Subscribe
     fun onServerConnect(event: ServerPreConnectEvent) {
-        instanceDestinations.get(event.player) {
+        gameDestinations.get(event.player) {
             // If there is no destination instance specified,
             // a lobby on that server should be used.
             if (event.originalServer != null) {
@@ -96,7 +87,7 @@ class InstanceRoutingHandler {
         )
     }
 
-    fun route(player: Player, instanceId: String?) {
-        instanceDestinations.put(player, instanceId)
+    fun route(player: Player, gameId: String?) {
+        gameDestinations.put(player, gameId)
     }
 }

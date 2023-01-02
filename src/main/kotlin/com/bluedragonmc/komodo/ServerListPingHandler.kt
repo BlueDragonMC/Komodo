@@ -1,6 +1,6 @@
 package com.bluedragonmc.komodo
 
-import com.bluedragonmc.api.grpc.playerCountRequest
+import com.bluedragonmc.api.grpc.ServerTracking
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.util.Favicon
@@ -23,7 +23,7 @@ class ServerListPingHandler {
     private fun watchConfig() {
         val watcher = FileSystems.getDefault().newWatchService()
         configDir.register(watcher, ENTRY_MODIFY, ENTRY_CREATE, ENTRY_DELETE)
-        while(true) {
+        while (true) {
             val key = watcher.take()
             for (event in key.pollEvents()) {
                 reloadConfig()
@@ -38,7 +38,7 @@ class ServerListPingHandler {
         val props = Properties().apply {
             load(configDir.resolve("proxy-config.properties").inputStream())
         }
-        val lines = (1 .. 2).map { i ->
+        val lines = (1..2).map { i ->
             val text = props.getProperty("motd.line_$i.text")
             val center = props.getProperty("motd.line_$i.center").lowercase() == "true"
             if (center) {
@@ -71,7 +71,8 @@ class ServerListPingHandler {
     private fun getOnlinePlayers(): Int {
         if (System.currentTimeMillis() - lastCheck > 5000) {
             runBlocking {
-                lastOnlinePlayerCount = Stubs.instanceSvc.getTotalPlayerCount(playerCountRequest { }).totalPlayers
+                lastOnlinePlayerCount =
+                    Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
             }
         }
         return lastOnlinePlayerCount
@@ -85,7 +86,7 @@ class ServerListPingHandler {
     init {
         pool.launch {
             reloadConfig() // Initially load the config
-            while(true) {
+            while (true) {
                 watchConfig() // Watch the config for changes, updating the MOTD as necessary
             }
         }
