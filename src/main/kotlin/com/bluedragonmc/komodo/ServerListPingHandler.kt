@@ -12,6 +12,7 @@ import java.nio.charset.Charset
 import java.nio.file.FileSystems
 import java.nio.file.Paths
 import java.nio.file.StandardWatchEventKinds.*
+import java.time.Duration
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
@@ -56,26 +57,15 @@ class ServerListPingHandler {
         String(Base64.getEncoder().encode(File("favicon_64.png").readBytes()), Charset.forName("UTF-8"))
     }.getOrElse { "" })
 
+    private var lastOnlinePlayerCount = 0
+
     @Subscribe
     fun onPing(event: ProxyPingEvent) {
         event.ping = event.ping.asBuilder()
             .favicon(favicon)
             .description(motd)
-            .onlinePlayers(getOnlinePlayers())
+            .onlinePlayers(lastOnlinePlayerCount)
             .build()
-    }
-
-    private val lastCheck = 0L
-    private var lastOnlinePlayerCount = 0
-
-    private fun getOnlinePlayers(): Int {
-        if (System.currentTimeMillis() - lastCheck > 5000) {
-            runBlocking {
-                lastOnlinePlayerCount =
-                    Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
-            }
-        }
-        return lastOnlinePlayerCount
     }
 
     private val pool = object : CoroutineScope {
@@ -90,5 +80,10 @@ class ServerListPingHandler {
                 watchConfig() // Watch the config for changes, updating the MOTD as necessary
             }
         }
+        Komodo.INSTANCE.proxyServer.scheduler.buildTask(Komodo.INSTANCE) {
+            lastOnlinePlayerCount = runBlocking {
+                Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
+            }
+        }.repeat(Duration.ofSeconds(30)).schedule()
     }
 }

@@ -2,12 +2,13 @@ package com.bluedragonmc.komodo
 
 import com.bluedragonmc.api.grpc.*
 import com.bluedragonmc.api.grpc.GetPlayersResponseKt.connectedPlayer
+import com.bluedragonmc.komodo.command.AddServerCommand
+import com.bluedragonmc.komodo.command.RemoveServerCommand
 import com.google.inject.Inject
 import com.google.protobuf.Empty
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
-import com.velocitypowered.api.event.player.ServerPostConnectEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.Plugin
@@ -21,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import java.net.InetSocketAddress
+import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
@@ -70,6 +72,18 @@ class Komodo {
             // Subscribe to events
             proxyServer.eventManager.register(this, ServerListPingHandler())
             proxyServer.eventManager.register(this, instanceRoutingHandler)
+
+            // Register commands
+            proxyServer.commandManager.register(AddServerCommand.create(proxyServer))
+            proxyServer.commandManager.register(RemoveServerCommand.create(proxyServer))
+
+            // Unregister empty servers every hour
+            proxyServer.scheduler.buildTask(this) {
+                proxyServer.allServers.filter { it.playersConnected.isEmpty() }.forEach { server ->
+                    proxyServer.unregisterServer(server.serverInfo)
+                }
+            }.repeat(Duration.ofHours(1)).schedule()
+
         } catch (e: Throwable) {
             logger.severe("There was an error initializing Komodo.")
             e.printStackTrace()
@@ -128,14 +142,6 @@ class Komodo {
                     }
                 }
             }
-        }
-    }
-
-    @Subscribe
-    fun onServerPostConnect(event: ServerPostConnectEvent) {
-        if (event.previousServer?.playersConnected?.isEmpty() == true) {
-            logger.info("Unregistering server ${event.previousServer?.serverInfo?.name} because its last player was sent to another server.")
-            proxyServer.unregisterServer(event.previousServer!!.serverInfo)
         }
     }
 
