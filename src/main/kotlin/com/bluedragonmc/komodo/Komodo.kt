@@ -154,12 +154,6 @@ class Komodo {
                 uuid = event.player.uniqueId.toString()
             })
         }
-
-        val server = event.player.currentServer.getOrNull()?.server
-        if (server?.playersConnected?.isEmpty() == true) {
-            logger.info("Unregistering server $server because its last player logged out.")
-            proxyServer.unregisterServer(server.serverInfo)
-        }
     }
 
     @Subscribe
