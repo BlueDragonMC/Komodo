@@ -3,6 +3,8 @@ package com.bluedragonmc.komodo
 import com.bluedragonmc.api.grpc.ServerTracking
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
+import com.velocitypowered.api.proxy.server.ServerPing.SamplePlayer
+import com.velocitypowered.api.proxy.server.ServerPing.Version
 import com.velocitypowered.api.util.Favicon
 import kotlinx.coroutines.*
 import net.kyori.adventure.text.Component
@@ -61,10 +63,18 @@ class ServerListPingHandler {
 
     @Subscribe
     fun onPing(event: ProxyPingEvent) {
+
+        val samplePlayers = Komodo.INSTANCE.proxyServer.allPlayers
+            .shuffled()
+            .take(5)
+            .map { SamplePlayer(it.username, it.uniqueId) }
+
         event.ping = event.ping.asBuilder()
             .favicon(favicon)
             .description(motd)
             .onlinePlayers(lastOnlinePlayerCount)
+            .version(Version(760, "1.19.2"))
+            .samplePlayers(*samplePlayers.toTypedArray())
             .build()
     }
 
