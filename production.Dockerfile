@@ -18,7 +18,6 @@ ARG VELOCITY_VERSION="3.2.0-SNAPSHOT"
 ARG VELOCITY_BUILD=260
 ARG REALIP_VERSION="2.6.0"
 ARG VIA_VERSION="4.5.1"
-ARG LP_VERSION="5.4.55"
 ARG PROTOCOLIZE_BUILD=727
 
 WORKDIR /proxy
@@ -27,7 +26,7 @@ ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/buil
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
 # Add LuckPerms for permissions
-ADD "https://download.luckperms.net/1463/velocity/LuckPerms-Velocity-$LP_VERSION.jar" /proxy/plugins/LuckPerms-$LP_VERSION.jar
+ADD "https://download.luckperms.net/1512/velocity/LuckPerms-Velocity-5.4.98.jar" /proxy/plugins/LuckPerms-$LP_VERSION.jar
 # Add the Jukebox plugin (and Protocolize, its dependency)
 ADD "https://ci.exceptionflug.de/job/Protocolize2/$PROTOCOLIZE_BUILD/artifact/protocolize-velocity/target/protocolize-velocity.jar" /proxy/plugins/protocolize-$PROTOCOLIZE_BUILD.jar
 ADD "https://github.com/BlueDragonMC/Jukebox/releases/download/latest/Jukebox-1.0-SNAPSHOT-all.jar" /proxy/plugins/Jukebox.jar
