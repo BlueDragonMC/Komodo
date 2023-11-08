@@ -168,10 +168,17 @@ class Komodo {
         // This is a way of differentiating intentional vs. accidental kicks that remains invisible to the end user
         val kickWasIntentional = event.serverKickReason.getOrNull()?.toPlainText()?.contains("\u00A0")
         if (kickWasIntentional == true) {
-            val extraInfo = Component.text(
-                "You were kicked while trying to join " + event.server.serverInfo.name + ".",
-                NamedTextColor.DARK_GRAY
-            )
+            val extraInfo = if (event.kickedDuringServerConnect()) {
+                Component.text(
+                    "You were kicked while trying to join " + event.server.serverInfo.name + ".",
+                    NamedTextColor.DARK_GRAY
+                )
+            } else {
+                Component.text(
+                    "You were kicked from " + event.server.serverInfo.name + ".",
+                    NamedTextColor.DARK_GRAY
+                )
+            }
             event.result =
                 KickedFromServerEvent.DisconnectPlayer.create(extraInfo + Component.newline() + event.serverKickReason.get())
             return
