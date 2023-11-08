@@ -164,10 +164,10 @@ class Komodo {
             return
         }
 
-        // Kick messages with a word joiner (U+2060) should not trigger failover
+        // Kick messages with a non-breaking space (U+00A0) should not trigger failover
         // This is a way of differentiating intentional vs. accidental kicks that remains invisible to the end user
-        val shouldForwardKick = event.serverKickReason.getOrNull()?.toPlainText()?.contains("\u2060")
-        if (shouldForwardKick == false) {
+        val kickWasIntentional = event.serverKickReason.getOrNull()?.toPlainText()?.contains("\u00A0")
+        if (kickWasIntentional == true) {
             val extraInfo = Component.text(
                 "You were kicked while trying to join " + event.server.serverInfo.name + ".",
                 NamedTextColor.DARK_GRAY
