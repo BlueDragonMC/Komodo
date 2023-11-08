@@ -160,8 +160,22 @@ class Komodo {
     fun onPlayerKick(event: KickedFromServerEvent) {
         if (event.kickedDuringServerConnect() || ((lastFailover[event.player]
                 ?: 0L) + 10000 > System.currentTimeMillis())
-        )
+        ) {
             return
+        }
+
+        // Kick messages with a word joiner (U+2060) should not trigger failover
+        // This is a way of differentiating intentional vs. accidental kicks that remains invisible to the end user
+        val shouldForwardKick = event.serverKickReason.getOrNull()?.toPlainText()?.contains("\u2060")
+        if (shouldForwardKick == false) {
+            val extraInfo = Component.text(
+                "You were kicked while trying to join " + event.server.serverInfo.name + ".",
+                NamedTextColor.DARK_GRAY
+            )
+            event.result =
+                KickedFromServerEvent.DisconnectPlayer.create(extraInfo + Component.newline() + event.serverKickReason.get())
+            return
+        }
 
         lastFailover[event.player] = System.currentTimeMillis()
 
