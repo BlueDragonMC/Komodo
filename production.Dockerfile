@@ -20,6 +20,9 @@ ARG REALIP_VERSION="2.6.0"
 ARG VIA_VERSION="4.5.1"
 ARG PROTOCOLIZE_BUILD=727
 
+LABEL com.bluedragonmc.image=komodo
+LABEL com.bluedragonmc.environment=production
+
 WORKDIR /proxy
 # Add Velocity using the version specified in the build arg
 ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/builds/$VELOCITY_BUILD/downloads/velocity-$VELOCITY_VERSION-$VELOCITY_BUILD.jar" /proxy/proxy.jar
