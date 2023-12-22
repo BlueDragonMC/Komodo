@@ -1,10 +1,10 @@
-package com.bluedragonmc.komodo
+package com.bluedragonmc.komodo.handler
 
 import com.bluedragonmc.api.grpc.ServerTracking
+import com.bluedragonmc.komodo.*
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
-import com.velocitypowered.api.proxy.server.ServerPing.SamplePlayer
-import com.velocitypowered.api.proxy.server.ServerPing.Version
+import com.velocitypowered.api.proxy.server.ServerPing
 import com.velocitypowered.api.util.Favicon
 import kotlinx.coroutines.*
 import net.kyori.adventure.text.Component
@@ -13,11 +13,13 @@ import java.io.File
 import java.nio.charset.Charset
 import java.nio.file.FileSystems
 import java.nio.file.Paths
-import java.nio.file.StandardWatchEventKinds.*
+import java.nio.file.StandardWatchEventKinds
 import java.time.Duration
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
+
+private const val PLAYER_COUNT_FETCH_INTERVAL = 5L
 
 class ServerListPingHandler {
 
@@ -25,7 +27,12 @@ class ServerListPingHandler {
 
     private fun watchConfig() {
         val watcher = FileSystems.getDefault().newWatchService()
-        configDir.register(watcher, ENTRY_MODIFY, ENTRY_CREATE, ENTRY_DELETE)
+        configDir.register(
+            watcher,
+            StandardWatchEventKinds.ENTRY_MODIFY,
+            StandardWatchEventKinds.ENTRY_CREATE,
+            StandardWatchEventKinds.ENTRY_DELETE
+        )
         while (true) {
             val key = watcher.take()
             for (event in key.pollEvents()) {
@@ -67,13 +74,13 @@ class ServerListPingHandler {
         val samplePlayers = Komodo.INSTANCE.proxyServer.allPlayers
             .shuffled()
             .take(5)
-            .map { SamplePlayer(it.username, it.uniqueId) }
+            .map { ServerPing.SamplePlayer(it.username, it.uniqueId) }
 
         event.ping = event.ping.asBuilder()
             .favicon(favicon)
             .description(motd)
             .onlinePlayers(lastOnlinePlayerCount)
-            .version(Version(763, "1.20"))
+            .version(ServerPing.Version(763, "1.20"))
             .samplePlayers(*samplePlayers.toTypedArray())
             .build()
     }
@@ -94,6 +101,6 @@ class ServerListPingHandler {
             lastOnlinePlayerCount = runBlocking {
                 Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
             }
-        }.repeat(Duration.ofSeconds(30)).schedule()
+        }.repeat(Duration.ofSeconds(PLAYER_COUNT_FETCH_INTERVAL)).schedule()
     }
 }
