@@ -1,6 +1,8 @@
-package com.bluedragonmc.komodo
+package com.bluedragonmc.komodo.handler
 
 import com.bluedragonmc.api.grpc.playerLoginRequest
+import com.bluedragonmc.komodo.Komodo
+import com.bluedragonmc.komodo.Stubs
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.velocitypowered.api.event.Subscribe

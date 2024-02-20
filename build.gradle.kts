@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.7.10"
-    kotlin("kapt") version "1.7.10"
+    kotlin("jvm") version "1.9.0"
+    kotlin("kapt") version "1.9.0"
     id("com.github.johnrengelman.shadow") version "7.0.0"
 }
 
@@ -30,7 +30,8 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:c2785493d9")
+    implementation("com.github.bluedragonmc:rpc:b7071251fb")
+    implementation("com.github.BlueDragonMC:Jukebox:a0d80dfc74")
 }
 
 tasks.shadowJar {
