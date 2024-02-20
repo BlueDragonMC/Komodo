@@ -73,7 +73,7 @@ class ServerListPingHandler {
             .favicon(favicon)
             .description(motd)
             .onlinePlayers(lastOnlinePlayerCount)
-            .version(Version(763, "1.20"))
+            .version(Version(765, "1.20.4"))
             .samplePlayers(*samplePlayers.toTypedArray())
             .build()
     }
