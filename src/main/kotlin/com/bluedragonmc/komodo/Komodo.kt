@@ -2,12 +2,12 @@ package com.bluedragonmc.komodo
 
 import com.bluedragonmc.api.grpc.findLobbyRequest
 import com.bluedragonmc.api.grpc.playerLogoutRequest
+import com.bluedragonmc.jukebox.JukeboxPlugin
 import com.bluedragonmc.komodo.command.AddServerCommand
 import com.bluedragonmc.komodo.command.RemoveServerCommand
 import com.bluedragonmc.komodo.handler.FailoverHandler
 import com.bluedragonmc.komodo.handler.InstanceRoutingHandler
 import com.bluedragonmc.komodo.handler.ServerListPingHandler
-import com.bluedragonmc.komodo.jukebox.JukeboxState
 import com.bluedragonmc.komodo.rpc.JukeboxService
 import com.bluedragonmc.komodo.rpc.PlayerHolderService
 import com.google.inject.Inject
@@ -47,6 +47,9 @@ class Komodo {
     @Inject
     lateinit var proxyServer: ProxyServer
 
+    @Inject
+    lateinit var jukeboxPlugin: JukeboxPlugin
+
     internal val instanceRoutingHandler = InstanceRoutingHandler()
 
     private lateinit var server: Server
@@ -59,9 +62,16 @@ class Komodo {
     fun onInit(event: ProxyInitializeEvent) {
         try {
             INSTANCE = this
+            val jukeboxService =
+                JukeboxService(
+                    proxyServer,
+                    jukeboxPlugin.getSongPlayer(proxyServer, this),
+                    jukeboxPlugin.getSongLoader()
+                )
+
             server = ServerBuilder.forPort(50051)
                 .addService(PlayerHolderService(proxyServer, logger, instanceRoutingHandler))
-                .addService(JukeboxService(proxyServer, logger))
+                .addService(jukeboxService)
                 .build()
             server.start()
 
@@ -74,7 +84,7 @@ class Komodo {
             proxyServer.eventManager.register(this, ServerListPingHandler())
             proxyServer.eventManager.register(this, instanceRoutingHandler)
             proxyServer.eventManager.register(this, FailoverHandler())
-            proxyServer.eventManager.register(this, JukeboxState)
+            proxyServer.eventManager.register(this, jukeboxService.jukeboxHandler)
 
             // Register commands
             proxyServer.commandManager.register(AddServerCommand.create(proxyServer))

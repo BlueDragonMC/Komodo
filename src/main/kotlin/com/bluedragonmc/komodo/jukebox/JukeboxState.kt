@@ -1,6 +1,8 @@
 package com.bluedragonmc.komodo.jukebox
 
-import com.bluedragonmc.jukebox.Song
+import com.bluedragonmc.jukebox.api.Song
+import com.bluedragonmc.jukebox.api.SongLoader
+import com.bluedragonmc.jukebox.api.SongPlayer
 import com.bluedragonmc.jukebox.event.SongEndEvent
 import com.bluedragonmc.jukebox.event.SongStartEvent
 import com.github.benmanes.caffeine.cache.Caffeine
@@ -8,6 +10,7 @@ import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.proxy.Player
 import java.time.Duration
 import kotlin.io.path.Path
+import kotlin.io.path.readBytes
 
 data class PlayerSongState(
     val isPlaying: Boolean,
@@ -22,7 +25,7 @@ data class SongState(
     val tags: List<String>,
 )
 
-object JukeboxState {
+class JukeboxState(private val songPlayer: SongPlayer, private val songLoader: SongLoader) {
 
     private val songStates = mutableMapOf<Player, PlayerSongState>()
 
@@ -39,12 +42,12 @@ object JukeboxState {
         if (oldState.isPlaying) {
             if (newState.queue.isEmpty()) {
                 // All songs were removed from the queue; stop the music
-                Song.stop(player)
+                songPlayer.stop(player)
             } else if (oldState.queue.isEmpty() || newState.queue.first() != oldState.queue.first()) {
                 // The currently-playing song was changed; play the new one
                 val entry = newState.queue.first()
                 val song = getSong(entry.fileName)
-                Song.play(song, player, entry.timeInTicks)
+                songPlayer.play(song, player, entry.timeInTicks)
             }
         }
 
@@ -60,14 +63,14 @@ object JukeboxState {
 
         if (clampedIndex == 0) {
             // Stop the current song and record its current time
-            val currentTime = Song.getCurrentSong(player)?.currentTimeInTicks
+            val currentTime = songPlayer.getCurrentSong(player)?.currentTick
             if (currentTime != null) {
                 newQueue[1] = newQueue[1].copy(timeInTicks = currentTime)
             }
-            Song.stop(player)
+            songPlayer.stop(player)
             // Play the new song
             val song = getSong(state.fileName)
-            Song.play(song, player, state.timeInTicks)
+            songPlayer.play(song, player, state.timeInTicks)
         }
 
         updateQueue(player) { newQueue }
@@ -103,7 +106,7 @@ object JukeboxState {
         .build<String, Song>()
 
     private fun getSong(fileName: String): Song = songCache.get(fileName) { _ ->
-        Song.loadRelative(Path(fileName))
+        songLoader.load(fileName, Path(fileName).readBytes())
     }
 
     @Subscribe
@@ -111,7 +114,7 @@ object JukeboxState {
         val player = event.player
         val state = getSongState(player)
 
-        if (event.song.fileName != state.queue.firstOrNull()?.fileName) {
+        if (event.song.source != state.queue.firstOrNull()?.fileName) {
             // A song *did* end, but it wasn't the first in the queue. There is no need to play the next song in this case.
             return
         }
@@ -127,7 +130,7 @@ object JukeboxState {
             // Play the next song
             val nextSong = newQueue.first()
             val song = getSong(nextSong.fileName)
-            Song.play(song, player, nextSong.timeInTicks)
+            songPlayer.play(song, player, nextSong.timeInTicks)
         }
     }
 
@@ -147,7 +150,7 @@ object JukeboxState {
                     0,
                     SongState(
                         event.song.songName,
-                        event.song.fileName,
+                        event.song.source,
                         event.startTimeInTicks,
                         event.song.durationInTicks,
                         emptyList()
