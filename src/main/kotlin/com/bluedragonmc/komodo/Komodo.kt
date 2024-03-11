@@ -61,7 +61,8 @@ class Komodo {
     fun onInit(event: ProxyInitializeEvent) {
         try {
             INSTANCE = this
-            server = ServerBuilder.forPort(50051).addService(PlayerHolderService()).build()
+            val port = System.getenv("KOMODO_GRPC_PORT")?.toIntOrNull() ?: 50051
+            server = ServerBuilder.forPort(port).addService(PlayerHolderService()).build()
             server.start()
 
             // Initialize gRPC channel to Puffin
