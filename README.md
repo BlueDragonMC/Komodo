@@ -8,6 +8,12 @@ BlueDragon's [Velocity](https://velocitypowered.com/) plugin. It currently serve
 ## Usage
 Build with `./gradlew build` and place the JAR from `build/libs/Komodo-x.x.x.jar` in your Velocity proxy's plugins folder.
 
+## Configuration
+Environment variables:
+- `KOMODO_PUFFIN_URI`: The URI used to connect to Puffin. Should comply with [this document](https://grpc.io/docs/guides/custom-name-resolution/).
+  
+  *Default value*: `puffin:50051`
+
 ## Development
 This can be built as a docker container with the following command:
 ```shell

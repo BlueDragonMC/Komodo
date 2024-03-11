@@ -7,7 +7,6 @@ import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
-import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
@@ -18,9 +17,9 @@ object Stubs {
     private lateinit var channel: ManagedChannel
 
     private fun createChannel(): ManagedChannel {
-        val addr = InetAddress.getByName("puffin").hostAddress
-        logger.info("Initializing gRPC channel - Connecting to puffin (resolves to ${addr})")
-        return ManagedChannelBuilder.forAddress("puffin", 50051)
+        val uri = System.getenv("KOMODO_PUFFIN_URI") ?: "puffin:50051"
+        logger.info("Initializing gRPC channel - Connecting to puffin at $uri")
+        return ManagedChannelBuilder.forTarget(uri)
             .defaultLoadBalancingPolicy("round_robin")
             .usePlaintext()
             .enableRetry()
@@ -47,7 +46,7 @@ object Stubs {
                 channel = createChannel()
                 break
             } catch (e: Throwable) {
-                connectAttempts ++
+                connectAttempts++
                 if (connectAttempts > 10) {
                     logger.error("Failed to connect to Puffin after 10 attempts.")
                     exitProcess(1)
