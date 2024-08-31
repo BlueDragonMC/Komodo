@@ -79,7 +79,7 @@ class Komodo {
             proxyServer.commandManager.register(RemoveServerCommand.create(proxyServer))
 
             // Unregister empty servers every hour
-            proxyServer.scheduler.buildTask(this) {
+            proxyServer.scheduler.buildTask(this) { _ ->
                 proxyServer.allServers.filter { it.playersConnected.isEmpty() }.forEach { server ->
                     proxyServer.unregisterServer(server.serverInfo)
                 }

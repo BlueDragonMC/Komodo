@@ -2,7 +2,7 @@
 # see https://docs.docker.com/engine/reference/builder/#buildkit
 
 # Build the project into an executable JAR
-FROM gradle:jdk17 as build
+FROM gradle:jdk17 AS build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
@@ -16,9 +16,9 @@ FROM eclipse-temurin:17
 EXPOSE 25565
 
 ARG VELOCITY_VERSION="3.3.0-SNAPSHOT"
-ARG VELOCITY_BUILD_NUMBER=370
-ARG REALIP_VERSION="2.6.0"
-ARG VIA_VERSION="4.5.1"
+ARG VELOCITY_BUILD_NUMBER=416
+ARG REALIP_VERSION="2.8.1"
+ARG VIA_VERSION="5.0.3"
 
 LABEL com.bluedragonmc.image=komodo
 LABEL com.bluedragonmc.environment=development
@@ -29,9 +29,9 @@ ADD "https://api.papermc.io/v2/projects/velocity/versions/$VELOCITY_VERSION/buil
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
 # Add LuckPerms for permissions
-ADD "https://download.luckperms.net/1526/velocity/LuckPerms-Velocity-5.4.113.jar" /proxy/plugins/LuckPerms-$LP_VERSION.jar
+ADD "https://download.luckperms.net/1556/velocity/LuckPerms-Velocity-5.4.141.jar" /proxy/plugins/LuckPerms.jar
 # Add the Jukebox plugin (and Protocolize, its dependency)
-ADD "https://github.com/BlueDragonMC/protocolize/releases/download/v2.3.4-beta/protocolize-velocity.jar" /proxy/plugins/protocolize-$PROTOCOLIZE_BUILD.jar
+ADD "https://ci.exceptionflug.de/job/Protocolize2/lastSuccessfulBuild/artifact/protocolize-velocity/target/protocolize-velocity.jar" /proxy/plugins/protocolize.jar
 ADD "https://github.com/BlueDragonMC/Jukebox/releases/download/latest/Jukebox-1.0-SNAPSHOT-all.jar" /proxy/plugins/Jukebox.jar
 # Add ViaVersion to allow newer clients to connect
 #ADD "https://github.com/ViaVersion/ViaVersion/releases/download/$VIA_VERSION/ViaVersion-${VIA_VERSION}.jar" /proxy/plugins/ViaVersion-$VIA_VERSION.jar

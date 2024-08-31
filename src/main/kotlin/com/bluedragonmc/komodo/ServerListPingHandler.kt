@@ -3,6 +3,7 @@ package com.bluedragonmc.komodo
 import com.bluedragonmc.api.grpc.ServerTracking
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
+import com.velocitypowered.api.network.ProtocolVersion
 import com.velocitypowered.api.proxy.server.ServerPing.SamplePlayer
 import com.velocitypowered.api.proxy.server.ServerPing.Version
 import com.velocitypowered.api.util.Favicon
@@ -73,7 +74,7 @@ class ServerListPingHandler {
             .favicon(favicon)
             .description(motd)
             .onlinePlayers(lastOnlinePlayerCount)
-            .version(Version(765, "1.20.4"))
+            .version(Version(ProtocolVersion.MINECRAFT_1_21.protocol, "1.21"))
             .samplePlayers(*samplePlayers.toTypedArray())
             .build()
     }
@@ -90,7 +91,7 @@ class ServerListPingHandler {
                 watchConfig() // Watch the config for changes, updating the MOTD as necessary
             }
         }
-        Komodo.INSTANCE.proxyServer.scheduler.buildTask(Komodo.INSTANCE) {
+        Komodo.INSTANCE.proxyServer.scheduler.buildTask(Komodo.INSTANCE) { _ ->
             lastOnlinePlayerCount = runBlocking {
                 Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
             }

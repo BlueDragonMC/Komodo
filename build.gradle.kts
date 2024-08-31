@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.7.10"
-    kotlin("kapt") version "1.7.10"
+    kotlin("jvm") version "2.0.20"
+    kotlin("kapt") version "2.0.20"
     id("com.github.johnrengelman.shadow") version "7.0.0"
 }
 
@@ -21,7 +21,7 @@ val grpcVersion = "1.51.0"
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.1")
-    compileOnly("com.velocitypowered:velocity-api:3.1.1")
+    compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
     implementation("net.kyori:adventure-text-minimessage:4.11.0")
     kapt("com.velocitypowered:velocity-api:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
