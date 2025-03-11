@@ -21,16 +21,16 @@ val grpcVersion = "1.51.0"
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.github.ben-manes.caffeine:caffeine:3.1.1")
-    compileOnly("com.velocitypowered:velocity-api:3.3.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation("net.kyori:adventure-text-minimessage:4.11.0")
-    kapt("com.velocitypowered:velocity-api:3.0.1")
+    kapt("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
 
     implementation("io.grpc:grpc-netty:$grpcVersion")
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:c2785493d9")
+    implementation("com.github.bluedragonmc:rpc:e06867b34a")
 }
 
 tasks.shadowJar {
