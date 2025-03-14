@@ -190,7 +190,7 @@ class Komodo {
         val (registeredServer, lobbyInstance) = getLobby(excluding = event.server.serverInfo.name)
         val msg = Component.text("You were kicked from ${event.server.serverInfo.name}: ", NamedTextColor.RED)
             .append(event.serverKickReason.orElse(Component.text("No reason specified", NamedTextColor.DARK_GRAY)))
-        if (registeredServer != null) {
+        if (registeredServer != null && lobbyInstance != null) {
             event.result = KickedFromServerEvent.RedirectPlayer.create(registeredServer, msg)
             instanceRoutingHandler.route(event.player, lobbyInstance)
         } else {

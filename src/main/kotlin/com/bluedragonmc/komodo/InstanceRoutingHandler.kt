@@ -18,7 +18,7 @@ class InstanceRoutingHandler {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    private val gameDestinations: Cache<Player, String> = Caffeine.newBuilder()
+    private val gameDestinations: Cache<Player, String?> = Caffeine.newBuilder()
         .expireAfterWrite(Duration.ofSeconds(30))
         .expireAfterAccess(Duration.ofSeconds(5))
         .weakKeys()
@@ -87,7 +87,7 @@ class InstanceRoutingHandler {
         )
     }
 
-    fun route(player: Player, gameId: String?) {
+    fun route(player: Player, gameId: String) {
         gameDestinations.put(player, gameId)
     }
 }
