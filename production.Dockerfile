@@ -2,7 +2,7 @@
 # This Dockerfile runs on the CI/CD pipeline when Komodo is being deployed.
 
 # Build the project into an executable JAR
-FROM docker.io/library/gradle:8.10.0-jdk21-alpine as build
+FROM docker.io/library/gradle:8.13-jdk21-alpine as build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
