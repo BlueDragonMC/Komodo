@@ -15,10 +15,10 @@ FROM docker.io/library/eclipse-temurin:21-jre-alpine
 EXPOSE 25565
 
 ARG VELOCITY_VERSION="3.4.0-SNAPSHOT"
-ARG VELOCITY_BUILD=479
+ARG VELOCITY_BUILD=483
 ARG REALIP_VERSION="2.8.1"
 ARG VIA_VERSION="5.0.3"
-ARG PROTOCOLIZE_BUILD=1171
+ARG PROTOCOLIZE_BUILD=1361
 
 LABEL com.bluedragonmc.image=komodo
 LABEL com.bluedragonmc.environment=production

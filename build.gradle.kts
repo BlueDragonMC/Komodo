@@ -19,13 +19,15 @@ repositories {
 val grpcKotlinVersion = "1.4.1"
 val protoVersion = "4.30.1"
 val grpcVersion = "1.71.0"
+val velocityVersion = "3.4.0-20250327.145921-45"
 
 dependencies {
+    compileOnly("com.velocitypowered:velocity-api:$velocityVersion")
+    kapt("com.velocitypowered:velocity-api:$velocityVersion")
+
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation("net.kyori:adventure-text-minimessage:4.19.0")
-    kapt("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
     implementation("io.grpc:grpc-netty:$grpcVersion")
