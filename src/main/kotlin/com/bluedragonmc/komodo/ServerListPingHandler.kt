@@ -74,7 +74,7 @@ class ServerListPingHandler {
             .favicon(favicon)
             .description(motd)
             .onlinePlayers(lastOnlinePlayerCount)
-            .version(Version(ProtocolVersion.MINECRAFT_1_21_5.protocol, "1.21.5"))
+            .version(Version(ProtocolVersion.MINECRAFT_1_21_7.protocol, "1.21.7-1.21.8"))
             .samplePlayers(*samplePlayers.toTypedArray())
             .build()
     }
