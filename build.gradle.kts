@@ -34,7 +34,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:bff6cb5ac2")
+    implementation("com.github.bluedragonmc:rpc:d40ac743b5")
 }
 
 kotlin {

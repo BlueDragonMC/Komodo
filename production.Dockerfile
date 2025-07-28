@@ -30,11 +30,6 @@ ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPSh
 # Add LuckPerms for permissions
 ADD "https://download.luckperms.net/1595/velocity/LuckPerms-Velocity-5.5.10.jar" /proxy/plugins/LuckPerms.jar
 
-# Add the Jukebox plugin (and Protocolize, its dependency)
-# This is a fork of Protocolize with support for up to 1.21.8-rc1. Thanks @proferabg!
-ADD "./assets/protocolize-velocity-proferabg-b1.jar" /proxy/plugins/protocolize-$PROTOCOLIZE_BUILD.jar
-ADD "https://github.com/BlueDragonMC/Jukebox/releases/download/latest/Jukebox-1.0-SNAPSHOT-all.jar" /proxy/plugins/Jukebox.jar
-
 COPY --from=build /work/build/libs/Komodo-*-all.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
 CMD ["sh", "/proxy/entrypoint.sh"]
