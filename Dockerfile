@@ -23,7 +23,7 @@ LABEL com.bluedragonmc.environment=development
 WORKDIR /proxy
 
 # Add Velocity
-ADD "https://fill-data.papermc.io/v1/objects/f82780ce33035ebe3d6ea7981f0e6e8a3e41a64f2080ef5c0f1266fada03cbee/velocity-3.4.0-SNAPSHOT-522.jar" /proxy/proxy.jar
+ADD "https://fill-data.papermc.io/v1/objects/b4eac4dc81dea6b183401c06dff44755f19da7fb4ec3495debde7fdcbb665e40/velocity-3.5.0-SNAPSHOT-583.jar" /proxy/proxy.jar
 
 # Add TCPShield's RealIP plugin
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
