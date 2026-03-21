@@ -1,8 +1,6 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
-    kotlin("jvm") version "2.1.10"
-    kotlin("kapt") version "2.1.10"
+    kotlin("jvm") version "2.3.0"
+    kotlin("kapt") version "2.3.0"
     id("com.gradleup.shadow") version "9.0.1"
 }
 
@@ -38,12 +36,13 @@ dependencies {
 }
 
 kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_21)
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
 tasks.shadowJar {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
 }
 
