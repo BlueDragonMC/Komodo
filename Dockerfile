@@ -29,7 +29,7 @@ ADD "https://fill-data.papermc.io/v1/objects/b4eac4dc81dea6b183401c06dff44755f19
 ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
 
 # Add LuckPerms for permissions
-ADD "https://download.luckperms.net/1595/velocity/LuckPerms-Velocity-5.5.10.jar" /proxy/plugins/LuckPerms.jar
+ADD "https://download.luckperms.net/1626/velocity/LuckPerms-Velocity-5.5.38.jar" /proxy/plugins/LuckPerms.jar
 
 COPY --from=build /work/build/libs/Komodo-*-all.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
