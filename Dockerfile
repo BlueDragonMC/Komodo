@@ -2,7 +2,7 @@
 # see https://docs.docker.com/engine/reference/builder/#buildkit
 
 # Build the project into an executable JAR
-FROM gradle:jdk21 AS build
+FROM gradle:jdk25 AS build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
@@ -11,7 +11,7 @@ RUN --mount=target=/home/gradle/.gradle,type=cache \
     /usr/bin/gradle --console=rich --warn --stacktrace --no-daemon --build-cache build
 
 # Run Velocity with the built JAR in its plugins folder and expose port 25565
-FROM eclipse-temurin:21
+FROM eclipse-temurin:25
 
 EXPOSE 25565
 

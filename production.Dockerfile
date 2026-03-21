@@ -2,7 +2,7 @@
 # This Dockerfile runs on the CI/CD pipeline when Komodo is being deployed.
 
 # Build the project into an executable JAR
-FROM docker.io/library/gradle:8.13-jdk21-alpine as build
+FROM docker.io/library/gradle:9.4-jdk25-alpine as build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
@@ -10,7 +10,7 @@ WORKDIR /work
 RUN /usr/bin/gradle --console=plain --info --stacktrace --no-daemon build
 
 # Run Velocity with the built JAR in its plugins folder and expose port 25565
-FROM docker.io/library/eclipse-temurin:21-jre-alpine
+FROM docker.io/library/eclipse-temurin:25-jre-alpine
 
 EXPOSE 25565
 
