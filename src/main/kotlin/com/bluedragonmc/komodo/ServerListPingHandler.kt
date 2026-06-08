@@ -7,6 +7,7 @@ import com.velocitypowered.api.network.ProtocolVersion
 import com.velocitypowered.api.proxy.server.ServerPing.SamplePlayer
 import com.velocitypowered.api.proxy.server.ServerPing.Version
 import com.velocitypowered.api.util.Favicon
+import io.grpc.Deadline
 import kotlinx.coroutines.*
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -15,8 +16,8 @@ import java.nio.charset.Charset
 import java.nio.file.FileSystems
 import java.nio.file.Paths
 import java.nio.file.StandardWatchEventKinds.*
-import java.time.Duration
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
 
@@ -60,6 +61,13 @@ class ServerListPingHandler {
         String(Base64.getEncoder().encode(File("favicon_64.png").readBytes()), Charset.forName("UTF-8"))
     }.getOrElse { "" })
 
+
+    // Limit player count refreshes to 5 requests in a 5-second window
+    private val playerCountRefreshTimes = mutableListOf<Long>()
+    private val rateLimitPeriod = 5_000
+    private val rateLimit = 5
+
+    // When the rate limit is exceeded, the previous value is used
     private var lastOnlinePlayerCount = 0
 
     @Subscribe
@@ -69,6 +77,16 @@ class ServerListPingHandler {
             .shuffled()
             .take(5)
             .map { SamplePlayer(it.username, it.uniqueId) }
+
+        playerCountRefreshTimes.removeAll { it < System.currentTimeMillis() - rateLimitPeriod }
+        if (playerCountRefreshTimes.size < rateLimit) {
+            playerCountRefreshTimes.add(System.currentTimeMillis())
+            lastOnlinePlayerCount = runBlocking {
+                Stubs.instanceSvc
+                    .withDeadline(Deadline.after(3, TimeUnit.SECONDS))
+                    .getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
+            }
+        }
 
         event.ping = event.ping.asBuilder()
             .favicon(favicon)
@@ -91,10 +109,5 @@ class ServerListPingHandler {
                 watchConfig() // Watch the config for changes, updating the MOTD as necessary
             }
         }
-        Komodo.INSTANCE.proxyServer.scheduler.buildTask(Komodo.INSTANCE) { _ ->
-            lastOnlinePlayerCount = runBlocking {
-                Stubs.instanceSvc.getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
-            }
-        }.repeat(Duration.ofSeconds(30)).schedule()
     }
 }
