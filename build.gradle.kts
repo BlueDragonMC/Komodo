@@ -10,7 +10,7 @@ rootProject.version = "0.1.0"
 repositories {
     mavenCentral()
     maven(url = "https://repo.papermc.io/repository/maven-public/")
-    maven(url = "https://jitpack.io")
+    maven(url = "https://reposilite.bluedragonmc.com/releases")
     mavenLocal()
 }
 
@@ -32,7 +32,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.github.bluedragonmc:rpc:d40ac743b5")
+    implementation("com.bluedragonmc:rpc:2026-06-13-f05505c")
 }
 
 kotlin {
