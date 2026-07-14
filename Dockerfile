@@ -2,7 +2,7 @@
 # see https://docs.docker.com/engine/reference/builder/#buildkit
 
 # Build the project into an executable JAR
-FROM gradle:jdk25 AS build
+FROM gradle:9.5.1-jdk25 AS build
 # Copy build files and source code
 COPY . /work
 WORKDIR /work
@@ -10,12 +10,12 @@ WORKDIR /work
 RUN --mount=target=/home/gradle/.gradle,type=cache \
     /usr/bin/gradle --console=rich --warn --stacktrace --no-daemon --build-cache build
 
-FROM badouralix/curl-jq AS luckperms
+FROM docker.io/badouralix/curl-jq:latest@sha256:3670578737d1d2019b10a4f9e607284101feb9fdd6b0478e78ea87bf61d96145 AS luckperms
 # Download the latest version of LuckPerms
 RUN curl -f "$(curl -f https://metadata.luckperms.net/data/all | jq -r '.downloads.velocity')" -o /tmp/luckperms.jar
 
 # Run Velocity with the built JAR in its plugins folder and expose port 25565
-FROM eclipse-temurin:25
+FROM eclipse-temurin:25-jre
 
 EXPOSE 25565
 
