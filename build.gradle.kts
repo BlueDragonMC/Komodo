@@ -17,7 +17,7 @@ repositories {
 val grpcKotlinVersion = "1.4.1"
 val protoVersion = "4.30.1"
 val grpcVersion = "1.71.0"
-val velocityVersion = "3.5.0-SNAPSHOT"
+val velocityVersion = "4.1.0-SNAPSHOT"
 
 dependencies {
     compileOnly("com.velocitypowered:velocity-api:$velocityVersion")
