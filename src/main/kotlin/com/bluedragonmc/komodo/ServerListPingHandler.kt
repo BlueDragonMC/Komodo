@@ -17,7 +17,9 @@ import java.nio.file.FileSystems
 import java.nio.file.Paths
 import java.nio.file.StandardWatchEventKinds.*
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
+import java.util.logging.Level
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
 
@@ -55,6 +57,7 @@ class ServerListPingHandler {
         motd = lines[0] + Component.newline() + lines[1]
     }
 
+    @Volatile
     private var motd: Component = Component.empty()
 
     private var favicon = Favicon("data:image/png;base64," + runCatching {
@@ -63,7 +66,7 @@ class ServerListPingHandler {
 
 
     // Limit player count refreshes to 5 requests in a 5-second window
-    private val playerCountRefreshTimes = mutableListOf<Long>()
+    private val playerCountRefreshTimes = ConcurrentLinkedQueue<Long>()
     private val rateLimitPeriod = 5_000
     private val rateLimit = 5
 
@@ -72,29 +75,38 @@ class ServerListPingHandler {
 
     @Subscribe
     fun onPing(event: ProxyPingEvent) {
+        try {
+            val samplePlayers = Komodo.INSTANCE.proxyServer.allPlayers
+                .shuffled()
+                .take(5)
+                .map { SamplePlayer(it.username, it.uniqueId) }
 
-        val samplePlayers = Komodo.INSTANCE.proxyServer.allPlayers
-            .shuffled()
-            .take(5)
-            .map { SamplePlayer(it.username, it.uniqueId) }
-
-        playerCountRefreshTimes.removeAll { it < System.currentTimeMillis() - rateLimitPeriod }
-        if (playerCountRefreshTimes.size < rateLimit) {
-            playerCountRefreshTimes.add(System.currentTimeMillis())
-            lastOnlinePlayerCount = runBlocking {
-                Stubs.instanceSvc
-                    .withDeadline(Deadline.after(3, TimeUnit.SECONDS))
-                    .getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
+            playerCountRefreshTimes.removeAll { it < System.currentTimeMillis() - rateLimitPeriod }
+            if (playerCountRefreshTimes.size < rateLimit) {
+                playerCountRefreshTimes.add(System.currentTimeMillis())
+                try {
+                    lastOnlinePlayerCount = runBlocking(Dispatchers.IO) {
+                        Stubs.instanceSvc
+                            .withDeadline(Deadline.after(3, TimeUnit.SECONDS))
+                            .getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
+                    }
+                } catch (e: Exception) {
+                    Komodo.INSTANCE.logger.log(Level.WARNING, "Failed to fetch total player count", e)
+                    // Keep the previous lastOnlinePlayerCount on gRPC failure
+                }
             }
-        }
 
-        event.ping = event.ping.asBuilder()
-            .favicon(favicon)
-            .description(motd)
-            .onlinePlayers(lastOnlinePlayerCount)
-            .version(Version(ProtocolVersion.MINECRAFT_26_2.protocol, "26.2"))
-            .samplePlayers(*samplePlayers.toTypedArray())
-            .build()
+            event.ping = event.ping.asBuilder()
+                .favicon(favicon)
+                .description(motd)
+                .onlinePlayers(lastOnlinePlayerCount)
+                .version(Version(ProtocolVersion.MINECRAFT_26_2.protocol, "26.2"))
+                .samplePlayers(*samplePlayers.toTypedArray())
+                .build()
+        } catch (t: Throwable) {
+            Komodo.INSTANCE.logger.log(Level.SEVERE, "Error in onPing handler", t)
+            throw t
+        }
     }
 
     private val pool = object : CoroutineScope {
