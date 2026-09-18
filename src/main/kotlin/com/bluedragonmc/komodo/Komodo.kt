@@ -30,7 +30,6 @@ import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 import kotlin.system.exitProcess
 
-@OptIn(ExperimentalStdlibApi::class)
 @Plugin(
     id = "komodo",
     name = "Komodo",
