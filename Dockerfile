@@ -19,8 +19,6 @@ FROM eclipse-temurin:25-jre
 
 EXPOSE 25565
 
-ARG REALIP_VERSION="2.8.1"
-
 LABEL com.bluedragonmc.image=komodo
 LABEL com.bluedragonmc.environment=development
 
@@ -28,9 +26,6 @@ WORKDIR /proxy
 
 # Add Velocity
 ADD "https://fill-data.papermc.io/v1/objects/b2879bb60eba6be23e99fdd659084b7adbe1190d42b7ddf296356331f8ea7c9a/velocity-4.2.1-SNAPSHOT-31.jar" /proxy/proxy.jar
-
-# Add TCPShield's RealIP plugin
-ADD "https://github.com/TCPShield/RealIP/releases/download/$REALIP_VERSION/TCPShield-$REALIP_VERSION.jar" /proxy/plugins/disabled/TCPShield-$REALIP_VERSION.jar
 
 # Add LuckPerms for permissions
 COPY --from=luckperms /tmp/luckperms.jar /proxy/plugins/LuckPerms.jar
