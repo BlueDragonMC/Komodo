@@ -30,6 +30,11 @@ ADD "https://fill-data.papermc.io/v1/objects/b2879bb60eba6be23e99fdd659084b7adbe
 # Add LuckPerms for permissions
 COPY --from=luckperms /tmp/luckperms.jar /proxy/plugins/LuckPerms.jar
 
+# Pre-download and relocate LuckPerms' runtime libraries so the image does not need to
+# fetch them on first start.
+COPY --chmod=755 tools/preload-luckperms.sh /usr/local/bin/preload-luckperms
+RUN preload-luckperms
+
 COPY --from=build /work/build/libs/Komodo-*-all.jar /proxy/plugins/Komodo.jar
 COPY /assets /proxy
 CMD ["sh", "/proxy/entrypoint.sh"]
