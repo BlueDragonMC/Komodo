@@ -25,7 +25,7 @@ LABEL com.bluedragonmc.environment=development
 WORKDIR /proxy
 
 # Add Velocity
-ADD "https://fill-data.papermc.io/v1/objects/b2879bb60eba6be23e99fdd659084b7adbe1190d42b7ddf296356331f8ea7c9a/velocity-4.2.1-SNAPSHOT-31.jar" /proxy/proxy.jar
+ADD "https://fill-data.papermc.io/v1/objects/0844bcabdcdb4f5b875906fd4c3365bc1bb76918e42bc595ed88ad195258dd75/velocity-4.3.1-45.jar" /proxy/proxy.jar
 
 # Add LuckPerms for permissions
 COPY --from=luckperms /tmp/luckperms.jar /proxy/plugins/LuckPerms.jar
