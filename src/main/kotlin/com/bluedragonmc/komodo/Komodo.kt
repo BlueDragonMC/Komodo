@@ -9,6 +9,7 @@ import com.google.protobuf.Empty
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
+import com.velocitypowered.api.event.player.ServerConnectedEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.Plugin
@@ -52,6 +53,8 @@ class Komodo {
 
     private lateinit var server: Server
 
+    private lateinit var lifecycle: ProxyLifecycle
+
     companion object {
         lateinit var INSTANCE: Komodo
     }
@@ -83,6 +86,14 @@ class Komodo {
                     proxyServer.unregisterServer(server.serverInfo)
                 }
             }.repeat(Duration.ofHours(1)).schedule()
+
+            lifecycle = ProxyLifecycle(this, proxyServer, logger)
+            lifecycle.start()
+
+            proxyServer.eventManager.register(
+                this,
+                ServerConnectedEvent::class.java,
+            ) { event -> lifecycle.onServerConnected(event.player) }
 
         } catch (e: Throwable) {
             logger.severe("There was an error initializing Komodo.")
@@ -231,5 +242,8 @@ class Komodo {
             server.awaitTermination(10, TimeUnit.SECONDS)
         }
         Stubs.shutdown()
+        if (::lifecycle.isInitialized) {
+            lifecycle.stop()
+        }
     }
 }

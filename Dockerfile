@@ -18,6 +18,7 @@ RUN curl -f "$(curl -f https://metadata.luckperms.net/data/all | jq -r '.downloa
 FROM eclipse-temurin:25-jre
 
 EXPOSE 25565
+EXPOSE 8081
 
 LABEL com.bluedragonmc.image=komodo
 LABEL com.bluedragonmc.environment=development
