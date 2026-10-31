@@ -38,6 +38,11 @@ Environment variables:
 
   *Default value*: `7200`
 
+- `KOMODO_COUNTDOWN_HIDDEN_SECONDS`: How long the countdown stays hidden at the start of a drain.
+  Players who switch games during this window are transferred without seeing a shutdown warning.
+
+  *Default value*: `3600`
+
 - `KOMODO_DRAIN_QUIESCENCE_MS`: How long a draining proxy must remain empty before it stops early.
 
   *Default value*: `15000`

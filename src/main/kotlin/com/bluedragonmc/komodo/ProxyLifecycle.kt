@@ -29,6 +29,10 @@ class ProxyLifecycle(
         envLong("KOMODO_HEALTH_TIMEOUT_MS", 1_000L).coerceAtLeast(1) * NANOS_PER_MILLI
     private val countdownSeconds =
         envLong("KOMODO_SHUTDOWN_COUNTDOWN_SECONDS", 2 * 60 * 60L).coerceAtLeast(1)
+    private val countdownHiddenSeconds =
+        envLong("KOMODO_COUNTDOWN_HIDDEN_SECONDS", 60 * 60L).coerceAtLeast(0)
+    private val effectiveHiddenSeconds =
+        countdownHiddenSeconds.coerceIn(0L, (countdownSeconds - MIN_VISIBLE_COUNTDOWN_SECONDS).coerceAtLeast(0L))
     private val drainQuiescenceNanos =
         envLong("KOMODO_DRAIN_QUIESCENCE_MS", 15_000L) * NANOS_PER_MILLI
 
@@ -193,19 +197,27 @@ class ProxyLifecycle(
         if (!draining.get()) return
         val activeCountdown = countdown ?: return
         val remaining = activeCountdown.remainingSeconds()
-        if (remaining <= 0) return
+        if (remaining <= 0 || !shouldAnnounce(remaining)) return
         runCatching { player.sendMessage(countdownMessage(remaining)) }
     }
 
     private fun announceMilestone(remainingSeconds: Long) {
+        if (!shouldAnnounce(remainingSeconds)) return
         val message = countdownMessage(remainingSeconds)
         proxyServer.allPlayers.forEach { player ->
             runCatching { player.sendMessage(message) }
         }
     }
 
+    /**
+     * The countdown is hidden for the first part of the drain so players who
+     * switch games during that window are transferred without a shutdown warning.
+     */
+    private fun shouldAnnounce(remainingSeconds: Long): Boolean =
+        remainingSeconds <= countdownSeconds - effectiveHiddenSeconds
+
     private fun countdownMessage(remainingSeconds: Long) = Component.text(
-        "This proxy is restarting in ${ShutdownCountdown.formatChat(remainingSeconds)}. When this happens, you will be disconnected from the server. Please leave and rejoin in between games to avoid interruptions.",
+        "This proxy is restarting in ${ShutdownCountdown.formatChat(remainingSeconds)}. You will be moved automatically when you switch games; if you stay on this server, you will be disconnected when it restarts.",
         NamedTextColor.RED,
     )
 
@@ -260,5 +272,8 @@ class ProxyLifecycle(
 
     private companion object {
         const val NANOS_PER_MILLI = 1_000_000L
+
+        /** Always leave at least this much of the countdown visible. */
+        const val MIN_VISIBLE_COUNTDOWN_SECONDS = 60L
     }
 }
