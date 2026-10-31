@@ -3,6 +3,7 @@ package com.bluedragonmc.komodo
 import com.bluedragonmc.api.grpc.InstanceServiceGrpcKt
 import com.bluedragonmc.api.grpc.LobbyServiceGrpcKt
 import com.bluedragonmc.api.grpc.PlayerTrackerGrpcKt
+import com.bluedragonmc.api.grpc.PlayerTransferGrpcKt
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.delay
@@ -36,6 +37,10 @@ object Stubs {
 
     val instanceSvc by lazy {
         InstanceServiceGrpcKt.InstanceServiceCoroutineStub(channel)
+    }
+
+    val playerTransfer by lazy {
+        PlayerTransferGrpcKt.PlayerTransferCoroutineStub(channel)
     }
 
     private var connectAttempts = 0

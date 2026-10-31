@@ -115,7 +115,9 @@ class ProxyLifecycle(
         return lastHeartbeat != 0L && System.nanoTime() - lastHeartbeat <= heartbeatTimeoutNanos
     }
 
-    private fun isReady(): Boolean = isHealthy() && !draining.get()
+    private fun isReady(): Boolean = isHealthy() && !isDraining()
+
+    fun isDraining(): Boolean = draining.get()
 
     @Synchronized
     fun beginDrain(): CompletableFuture<Unit> {

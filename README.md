@@ -42,6 +42,15 @@ Environment variables:
 
   *Default value*: `15000`
 
+- `KOMODO_TRANSFER_HOST`: The player-facing proxy hostname used in transfer packets. If unset, proxy
+  transfers are disabled.
+
+  *Default value*: unset
+
+- `KOMODO_TRANSFER_PORT`: The player-facing proxy port used in transfer packets.
+
+  *Default value*: `25565`
+
 - `KOMODO_LIFECYCLE_DISABLED`: If present, disables the lifecycle HTTP endpoints.
 
 ## Development

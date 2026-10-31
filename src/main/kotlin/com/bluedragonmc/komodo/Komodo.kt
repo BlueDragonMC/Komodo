@@ -17,6 +17,7 @@ import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
+import io.grpc.ManagedChannelBuilder
 import io.grpc.Server
 import io.grpc.ServerBuilder
 import kotlinx.coroutines.runBlocking
@@ -50,6 +51,14 @@ class Komodo {
     private val lastFailover = mutableMapOf<Player, Long>()
 
     private val instanceRoutingHandler = InstanceRoutingHandler()
+
+    /** Public, client-reachable proxy address used for transfer packets. */
+    private val transferHost = System.getenv("KOMODO_TRANSFER_HOST")?.takeIf { it.isNotBlank() }
+    private val transferPort = System.getenv("KOMODO_TRANSFER_PORT")?.toIntOrNull() ?: 25565
+
+    private fun proxyPodName(): String = System.getenv("HOSTNAME") ?: ""
+
+    private fun isDraining(): Boolean = ::lifecycle.isInitialized && lifecycle.isDraining()
 
     private lateinit var server: Server
 
@@ -103,29 +112,69 @@ class Komodo {
     }
 
     inner class PlayerHolderService : PlayerHolderGrpcKt.PlayerHolderCoroutineImplBase() {
-        @OptIn(ExperimentalStdlibApi::class)
         override suspend fun sendPlayer(request: PlayerHolderOuterClass.SendPlayerRequest): PlayerHolderOuterClass.SendPlayerResponse {
-
             val uuid = UUID.fromString(request.playerUuid)
             val player = proxyServer.getPlayer(uuid).getOrNull()
+                ?: return sendPlayerResponse { playerFound = false }
+
+            // If this proxy is draining, send the player to a replacement proxy instead of transferring them within this proxy
+            if (isDraining() && transferHost != null) {
+                val prepared = try {
+                    Stubs.playerTransfer.withDeadlineAfter(5, TimeUnit.SECONDS)
+                        .prepareTransfer(prepareTransferRequest {
+                            playerUuid = request.playerUuid
+                            proxyPodName = proxyPodName()
+                            serverName = request.serverName
+                            gameId = request.instanceId
+                        })
+                } catch (e: Throwable) {
+                    logger.warning("Could not prepare a proxy transfer for ${player.username}: ${e.message}")
+                    null
+                }
+
+                if (prepared?.accepted == true) {
+                    try {
+                        player.transferToHost(InetSocketAddress(transferHost, transferPort))
+                        logger.info(
+                            "Transferring ${player.username} to $transferHost:$transferPort " +
+                                    "for server ${request.serverName} / instance ${request.instanceId}"
+                        )
+                        return sendPlayerResponse {
+                            playerFound = true
+                            successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_SERVER
+                            successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_INSTANCE
+                            successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.TRANSFERRED
+                        }
+                    } catch (e: Throwable) {
+                        logger.warning("Could not transfer ${player.username} to the replacement proxy: ${e.message}")
+                    }
+                } else if (prepared != null) {
+                    logger.info(
+                        "Proxy transfer for ${player.username} was rejected: ${prepared.rejectionReason}"
+                    )
+                }
+            }
+
             val registeredServer = proxyServer.getServer(request.serverName).getOrNull() ?: run {
                 logger.info("Registering server ${request.serverName} at ${request.gameServerIp}:${request.gameServerPort} to send player $player to it.")
                 proxyServer.registerServer(
                     ServerInfo(request.serverName, InetSocketAddress(request.gameServerIp, request.gameServerPort))
                 )
             }
-            // Don't try to send a player to their current server
-            if (player == null || registeredServer == null) {
-                return sendPlayerResponse {
-                    playerFound = player != null
-                }
-            }
+
+            // If the player is already on the target server, Puffin normally
+            // sends the request to the game server directly. If it reached the
+            // proxy instead (for example because Puffin briefly saw this proxy
+            // as draining), forward it so the instance change still happens.
             if (player.currentServer.getOrNull()?.serverInfo?.name == registeredServer.serverInfo.name) {
+                val forwarded = forwardToGameServer(request)
+                if (forwarded != null) return forwarded
                 return sendPlayerResponse {
                     playerFound = true
                     successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_SERVER
                 }
             }
+
             try {
                 instanceRoutingHandler.route(player, request.instanceId.toString())
                 player.createConnectionRequest(registeredServer).fireAndForget()
@@ -138,6 +187,31 @@ class Komodo {
                 playerFound = true
                 successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_SERVER
                 successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_INSTANCE
+            }
+        }
+
+        private suspend fun forwardToGameServer(
+            request: PlayerHolderOuterClass.SendPlayerRequest
+        ): PlayerHolderOuterClass.SendPlayerResponse? {
+            val address = request.gameServerIp
+            if (address.isBlank()) return null
+            val port = request.gameServerGrpcPort
+            return try {
+                val channel = ManagedChannelBuilder.forAddress(address, port)
+                    .usePlaintext()
+                    .build()
+                try {
+                    PlayerHolderGrpcKt.PlayerHolderCoroutineStub(channel)
+                        .withDeadlineAfter(5, TimeUnit.SECONDS)
+                        .sendPlayer(request)
+                } finally {
+                    channel.shutdown()
+                }
+            } catch (e: Throwable) {
+                logger.warning(
+                    "Could not forward player ${request.playerUuid} to game server $address:$port: ${e.message}"
+                )
+                null
             }
         }
 
@@ -163,6 +237,7 @@ class Komodo {
             Stubs.playerTracking.playerLogout(playerLogoutRequest {
                 username = event.player.username
                 uuid = event.player.uniqueId.toString()
+                proxyPodName = proxyPodName()
             })
         }
     }
@@ -234,6 +309,7 @@ class Komodo {
                 Stubs.playerTracking.playerLogout(playerLogoutRequest {
                     username = player.username
                     uuid = player.uniqueId.toString()
+                    proxyPodName = proxyPodName()
                 })
             }
         }

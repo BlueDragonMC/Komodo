@@ -1,5 +1,6 @@
 package com.bluedragonmc.komodo
 
+import com.bluedragonmc.api.grpc.consumeTransferRequest
 import com.bluedragonmc.api.grpc.playerLoginRequest
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
@@ -8,11 +9,15 @@ import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.player.ServerLoginPluginMessageEvent
 import com.velocitypowered.api.event.player.ServerPreConnectEvent
 import com.velocitypowered.api.proxy.Player
+import com.velocitypowered.api.proxy.server.ServerInfo
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.slf4j.LoggerFactory
+import java.net.InetSocketAddress
 import java.time.Duration
+import java.util.concurrent.TimeUnit
+import kotlin.jvm.optionals.getOrNull
 
 class InstanceRoutingHandler {
 
@@ -60,6 +65,11 @@ class InstanceRoutingHandler {
 
     @Subscribe
     fun onPlayerJoin(event: PlayerChooseInitialServerEvent) {
+        if (routeTransferredPlayer(event)) {
+            registerLogin(event.player)
+            return
+        }
+
         // When a player joins, send them to the lobby with the most players
         val (registeredServer, lobbyInstance) = Komodo.INSTANCE.getLobby()
         if (registeredServer != null && !lobbyInstance.isNullOrEmpty()) {
@@ -67,14 +77,7 @@ class InstanceRoutingHandler {
             route(event.player, lobbyInstance)
             logger.info("Routing player ${event.player.username} to instance '$lobbyInstance' on server '${registeredServer.serverInfo.name}'.")
 
-            runBlocking {
-                Stubs.playerTracking.playerLogin(playerLoginRequest {
-                    username = event.player.username
-                    uuid = event.player.uniqueId.toString()
-                    proxyPodName = System.getenv("HOSTNAME")
-                })
-            }
-
+            registerLogin(event.player)
             return
         }
 
@@ -85,6 +88,60 @@ class InstanceRoutingHandler {
                 NamedTextColor.RED
             )
         )
+    }
+
+    private fun routeTransferredPlayer(event: PlayerChooseInitialServerEvent): Boolean {
+        val player = event.player
+        val transfer = try {
+            runBlocking {
+                Stubs.playerTransfer.withDeadlineAfter(3, TimeUnit.SECONDS)
+                    .consumeTransfer(consumeTransferRequest {
+                        playerUuid = player.uniqueId.toString()
+                    })
+            }
+        } catch (e: Throwable) {
+            logger.warn("Could not consume a pending proxy transfer for ${player.username}", e)
+            return false
+        }
+
+        if (!transfer.found) return false
+
+        val proxyServer = Komodo.INSTANCE.proxyServer
+        val targetAddress = InetSocketAddress(transfer.gameServerIp, transfer.gameServerPort)
+        val existingServer = proxyServer.getServer(transfer.serverName).getOrNull()
+        val registeredServer = if (existingServer != null && existingServer.serverInfo.address == targetAddress) {
+            existingServer
+        } else {
+            if (existingServer != null) {
+                proxyServer.unregisterServer(existingServer.serverInfo)
+            }
+            logger.info(
+                "Registering transferred server ${transfer.serverName} at " +
+                        "${transfer.gameServerIp}:${transfer.gameServerPort}"
+            )
+            proxyServer.registerServer(ServerInfo(transfer.serverName, targetAddress))
+        }
+
+        // Set the destination before the initial server is connected so
+        // ServerPreConnectEvent does not redirect the player to a lobby.
+        route(player, transfer.gameId)
+        event.setInitialServer(registeredServer)
+
+        logger.info(
+            "Routing transferred player ${player.username} to instance '${transfer.gameId}' " +
+                    "on server '${transfer.serverName}'."
+        )
+        return true
+    }
+
+    private fun registerLogin(player: Player) {
+        runBlocking {
+            Stubs.playerTracking.playerLogin(playerLoginRequest {
+                username = player.username
+                uuid = player.uniqueId.toString()
+                proxyPodName = System.getenv("HOSTNAME")
+            })
+        }
     }
 
     fun route(player: Player, gameId: String) {
