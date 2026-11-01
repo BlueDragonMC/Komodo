@@ -58,6 +58,9 @@ Environment variables:
 
 - `KOMODO_LIFECYCLE_DISABLED`: If present, disables the lifecycle HTTP endpoints.
 
+- `VELOCITY_HAPROXY_PROTOCOL`: Set to `true` to make Velocity expect a PROXY protocol
+  header on every connection.
+
 ## Development
 
 This can be built as a docker container with the following command:
