@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.4.21"
-    kotlin("kapt") version "2.4.21"
-    id("com.gradleup.shadow") version "9.0.1"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.shadow)
 }
 
 rootProject.group = "com.bluedragonmc"
@@ -14,30 +14,25 @@ repositories {
     mavenLocal()
 }
 
-val grpcKotlinVersion = "1.4.1"
-val protoVersion = "4.30.1"
-val grpcVersion = "1.71.0"
-val velocityVersion = "4.2.1-SNAPSHOT"
-
 dependencies {
-    compileOnly("com.velocitypowered:velocity-api:$velocityVersion")
-    kapt("com.velocitypowered:velocity-api:$velocityVersion")
+    compileOnly(libs.velocity.api)
+    kapt(libs.velocity.api)
 
-    implementation("org.jetbrains.kotlin:kotlin-stdlib")
-    implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
-    implementation("net.kyori:adventure-text-minimessage:4.19.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    implementation(libs.kotlin.stdlib)
+    implementation(libs.caffeine)
+    implementation(libs.minimessage)
+    implementation(libs.coroutines.core)
 
-    implementation("io.grpc:grpc-netty:$grpcVersion")
-    implementation("io.grpc:grpc-protobuf:$grpcVersion")
-    implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinVersion")
-    implementation("com.google.protobuf:protobuf-kotlin:$protoVersion")
-    implementation("com.bluedragonmc:rpc:2026-10-31-015108b")
+    implementation(libs.grpc.netty)
+    implementation(libs.grpc.protobuf)
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.protobuf.kotlin)
+    implementation(libs.rpc)
 }
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.jvm.get().toInt()))
     }
 }
 
