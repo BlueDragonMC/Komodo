@@ -14,7 +14,7 @@ object RemoveServerCommand {
     fun create(proxyServer: ProxyServer): BrigadierCommand {
         val node = LiteralArgumentBuilder.literal<CommandSource>("removeserver")
             .requires { source -> source.hasPermission("command.removeserver") }
-            .then(RequiredArgumentBuilder.argument<CommandSource?, String?>("name", StringArgumentType.string())
+            .then(RequiredArgumentBuilder.argument<CommandSource, String>("name", StringArgumentType.string())
                 .suggests { context, builder ->
                     val filter = if (context.arguments.containsKey("name"))
                         context.getArgument("name", String::class.java) else ""
