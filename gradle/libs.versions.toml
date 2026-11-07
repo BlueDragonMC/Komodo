@@ -2,14 +2,14 @@
 # @keep Used by the build script for the Java toolchain
 jvm = "25"
 kotlin = "2.4.21"
-shadow = "9.0.1"
+shadow = "9.6.1"
 velocity = "4.2.1-SNAPSHOT"
-caffeine = "3.2.0"
-minimessage = "4.19.0"
-coroutines = "1.10.1"
-grpc = "1.71.0"
-grpc-kotlin-stub = "1.4.1"
-protobuf = "4.30.1"
+caffeine = "3.3.1"
+minimessage = "5.2.0"
+coroutines = "1.11.0"
+grpc = "1.85.1"
+grpc-kotlin-stub = "1.5.0"
+protobuf = "4.36.2"
 rpc = "2026-10-31-015108b"
 
 [libraries]
