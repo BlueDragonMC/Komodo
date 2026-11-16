@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import java.util.logging.Logger
+import org.slf4j.Logger
 
 /**
  * Kubernetes lifecycle endpoints and graceful shutdown/draining.
@@ -66,7 +66,7 @@ class ProxyLifecycle(
 
     fun start() {
         if (System.getenv("KOMODO_LIFECYCLE_DISABLED") != null) {
-            logger.warning("Proxy lifecycle endpoints are disabled by KOMODO_LIFECYCLE_DISABLED.")
+            logger.warn("Proxy lifecycle endpoints are disabled by KOMODO_LIFECYCLE_DISABLED.")
             initialized.set(true)
             return
         }
@@ -97,8 +97,7 @@ class ProxyLifecycle(
             logger.info("Proxy lifecycle endpoints listening on port $lifecyclePort")
             Runtime.getRuntime().addShutdownHook(Thread(::stop, "komodo-lifecycle-shutdown"))
         } catch (e: Exception) {
-            logger.severe("Failed to start proxy lifecycle endpoints on port $lifecyclePort")
-            e.printStackTrace()
+            logger.error("Failed to start proxy lifecycle endpoints on port $lifecyclePort", e)
             throw e
         }
     }
@@ -136,7 +135,7 @@ class ProxyLifecycle(
         try {
             countdownTask = scheduler.scheduleAtFixedRate(::drainTick, 0, 1, TimeUnit.SECONDS)
         } catch (e: RejectedExecutionException) {
-            logger.severe("Could not schedule the proxy shutdown countdown: $e")
+            logger.error("Could not schedule the proxy shutdown countdown", e)
             future.complete(Unit)
         }
 
@@ -185,7 +184,7 @@ class ProxyLifecycle(
                 emptySinceNanos = null
             }
         } catch (e: Throwable) {
-            logger.severe("Error while running the proxy shutdown countdown: $e")
+            logger.error("Error while running the proxy shutdown countdown", e)
             e.printStackTrace()
         }
     }
@@ -254,7 +253,7 @@ class ProxyLifecycle(
         try {
             future.join()
         } catch (e: Throwable) {
-            logger.severe("The proxy shutdown drain did not complete normally: $e")
+            logger.error("The proxy shutdown drain did not complete normally", e)
             e.printStackTrace()
         }
         respond(exchange, 200, "drained")

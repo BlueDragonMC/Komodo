@@ -4,6 +4,7 @@ import com.bluedragonmc.api.grpc.*
 import com.bluedragonmc.api.grpc.GetPlayersResponseKt.connectedPlayer
 import com.bluedragonmc.komodo.command.AddServerCommand
 import com.bluedragonmc.komodo.command.RemoveServerCommand
+import com.bluedragonmc.komodo.LogContext
 import com.google.inject.Inject
 import com.google.protobuf.Empty
 import com.velocitypowered.api.event.Subscribe
@@ -27,7 +28,7 @@ import java.net.InetSocketAddress
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
-import java.util.logging.Logger
+import org.slf4j.LoggerFactory
 import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 import kotlin.system.exitProcess
@@ -42,8 +43,7 @@ import kotlin.system.exitProcess
 )
 class Komodo {
 
-    @Inject
-    lateinit var logger: Logger
+    internal val logger = LoggerFactory.getLogger(Komodo::class.java)
 
     @Inject
     lateinit var proxyServer: ProxyServer
@@ -105,7 +105,7 @@ class Komodo {
             ) { event -> lifecycle.onServerConnected(event.player) }
 
         } catch (e: Throwable) {
-            logger.severe("There was an error initializing Komodo.")
+            logger.error("There was an error initializing Komodo.")
             e.printStackTrace()
             exitProcess(1)
         }
@@ -128,17 +128,28 @@ class Komodo {
                             gameId = request.instanceId
                         })
                 } catch (e: Throwable) {
-                    logger.warning("Could not prepare a proxy transfer for ${player.username}: ${e.message}")
+                    LogContext.with(LogContext.player(player.uniqueId, player.username)) {
+                        logger.warn("Could not prepare a proxy transfer for ${player.username}", e)
+                    }
                     null
                 }
 
                 if (prepared?.accepted == true) {
                     try {
                         player.transferToHost(InetSocketAddress(transferHost, transferPort))
-                        logger.info(
-                            "Transferring ${player.username} to $transferHost:$transferPort " +
-                                    "for server ${request.serverName} / instance ${request.instanceId}"
-                        )
+                        LogContext.with(
+                            LogContext.player(player.uniqueId, player.username) +
+                                    LogContext.game(
+                                        request.instanceId,
+                                        server = request.serverName,
+                                        proxy = proxyPodName(),
+                                    )
+                        ) {
+                            logger.info(
+                                "Transferring ${player.username} to $transferHost:$transferPort " +
+                                        "for server ${request.serverName} / instance ${request.instanceId}"
+                            )
+                        }
                         return sendPlayerResponse {
                             playerFound = true
                             successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_SERVER
@@ -146,17 +157,26 @@ class Komodo {
                             successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.TRANSFERRED
                         }
                     } catch (e: Throwable) {
-                        logger.warning("Could not transfer ${player.username} to the replacement proxy: ${e.message}")
+                        LogContext.with(LogContext.player(player.uniqueId, player.username)) {
+                            logger.warn("Could not transfer ${player.username} to the replacement proxy", e)
+                        }
                     }
                 } else if (prepared != null) {
-                    logger.info(
-                        "Proxy transfer for ${player.username} was rejected: ${prepared.rejectionReason}"
-                    )
+                    LogContext.with(LogContext.player(player.uniqueId, player.username)) {
+                        logger.info(
+                            "Proxy transfer for ${player.username} was rejected: ${prepared.rejectionReason}"
+                        )
+                    }
                 }
             }
 
             val registeredServer = proxyServer.getServer(request.serverName).getOrNull() ?: run {
-                logger.info("Registering server ${request.serverName} at ${request.gameServerIp}:${request.gameServerPort} to send player $player to it.")
+                LogContext.with(
+                    LogContext.player(player.uniqueId, player.username) +
+                            LogContext.game(request.instanceId, server = request.serverName, proxy = proxyPodName())
+                ) {
+                    logger.info("Registering server ${request.serverName} at ${request.gameServerIp}:${request.gameServerPort} to send player $player to it.")
+                }
                 proxyServer.registerServer(
                     ServerInfo(request.serverName, InetSocketAddress(request.gameServerIp, request.gameServerPort))
                 )
@@ -179,10 +199,16 @@ class Komodo {
                 instanceRoutingHandler.route(player, request.instanceId.toString())
                 player.createConnectionRequest(registeredServer).fireAndForget()
             } catch (e: Throwable) {
-                logger.warning("Error sending player ${player.username} to server $registeredServer!")
-                e.printStackTrace()
+                LogContext.with(LogContext.player(player.uniqueId, player.username)) {
+                    logger.warn("Error sending player ${player.username} to server $registeredServer!", e)
+                }
             }
-            logger.info("Sending player $player to server $registeredServer and instance ${request.instanceId}")
+            LogContext.with(
+                LogContext.player(player.uniqueId, player.username) +
+                        LogContext.game(request.instanceId, server = request.serverName, proxy = proxyPodName())
+            ) {
+                logger.info("Sending player $player to server $registeredServer and instance ${request.instanceId}")
+            }
             return sendPlayerResponse {
                 playerFound = true
                 successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_SERVER
@@ -208,9 +234,11 @@ class Komodo {
                     channel.shutdown()
                 }
             } catch (e: Throwable) {
-                logger.warning(
-                    "Could not forward player ${request.playerUuid} to game server $address:$port: ${e.message}"
-                )
+                LogContext.with(LogContext.player(request.playerUuid)) {
+                    logger.warn(
+                        "Could not forward player ${request.playerUuid} to game server $address:$port", e
+                    )
+                }
                 null
             }
         }

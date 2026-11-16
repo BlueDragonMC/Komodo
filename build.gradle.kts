@@ -39,6 +39,8 @@ kotlin {
 tasks.shadowJar {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
+
+    dependsOn("kaptKotlin")
 }
 
 tasks["build"].dependsOn(tasks["shadowJar"])

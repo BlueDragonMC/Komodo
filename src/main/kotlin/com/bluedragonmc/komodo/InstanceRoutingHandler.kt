@@ -2,6 +2,7 @@ package com.bluedragonmc.komodo
 
 import com.bluedragonmc.api.grpc.consumeTransferRequest
 import com.bluedragonmc.api.grpc.playerLoginRequest
+import com.bluedragonmc.komodo.LogContext
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.velocitypowered.api.event.Subscribe
@@ -38,9 +39,22 @@ class InstanceRoutingHandler {
             val bytes = gameId.toByteArray()
             // Reply to the request with these bytes
             event.result = ServerLoginPluginMessageEvent.ResponseResult.reply(bytes)
-            logger.info("Sending player ${event.connection.player.username} to instance '$gameId' on server '${event.connection.serverInfo.name}'")
+            LogContext.with(
+                LogContext.player(event.connection.player.uniqueId, event.connection.player.username) +
+                        LogContext.game(
+                            gameId,
+                            server = event.connection.serverInfo.name,
+                            proxy = System.getenv("HOSTNAME"),
+                        )
+            ) {
+                logger.info("Sending player ${event.connection.player.username} to instance '$gameId' on server '${event.connection.serverInfo.name}'")
+            }
         } else if (event.identifier.id.startsWith("bluedragonmc:")) {
-            logger.warn("Login plugin message sent on unexpected channel: '${event.identifier.id}'")
+            LogContext.with(
+                LogContext.player(event.connection.player.uniqueId, event.connection.player.username)
+            ) {
+                logger.warn("Login plugin message sent on unexpected channel: '${event.identifier.id}'")
+            }
             event.result = ServerLoginPluginMessageEvent.ResponseResult.unknown()
         }
     }
@@ -75,13 +89,24 @@ class InstanceRoutingHandler {
         if (registeredServer != null && !lobbyInstance.isNullOrEmpty()) {
             event.setInitialServer(registeredServer)
             route(event.player, lobbyInstance)
-            logger.info("Routing player ${event.player.username} to instance '$lobbyInstance' on server '${registeredServer.serverInfo.name}'.")
+            LogContext.with(
+                LogContext.player(event.player.uniqueId, event.player.username) +
+                        LogContext.game(
+                            lobbyInstance,
+                            server = registeredServer.serverInfo.name,
+                            proxy = System.getenv("HOSTNAME"),
+                        )
+            ) {
+                logger.info("Routing player ${event.player.username} to instance '$lobbyInstance' on server '${registeredServer.serverInfo.name}'.")
+            }
 
             registerLogin(event.player)
             return
         }
 
-        logger.warn("No lobby found for ${event.player} to join!")
+        LogContext.with(LogContext.player(event.player.uniqueId, event.player.username)) {
+            logger.warn("No lobby found for ${event.player} to join!")
+        }
         event.player.disconnect(
             Component.text(
                 "No lobby was found for you to join! Try rejoining in a few minutes.",
@@ -100,7 +125,9 @@ class InstanceRoutingHandler {
                     })
             }
         } catch (e: Throwable) {
-            logger.warn("Could not consume a pending proxy transfer for ${player.username}", e)
+            LogContext.with(LogContext.player(player.uniqueId, player.username)) {
+                logger.warn("Could not consume a pending proxy transfer for ${player.username}", e)
+            }
             return false
         }
 
@@ -127,10 +154,19 @@ class InstanceRoutingHandler {
         route(player, transfer.gameId)
         event.setInitialServer(registeredServer)
 
-        logger.info(
-            "Routing transferred player ${player.username} to instance '${transfer.gameId}' " +
-                    "on server '${transfer.serverName}'."
-        )
+        LogContext.with(
+            LogContext.player(player.uniqueId, player.username) +
+                    LogContext.game(
+                        transfer.gameId,
+                        server = transfer.serverName,
+                        proxy = System.getenv("HOSTNAME"),
+                    )
+        ) {
+            logger.info(
+                "Routing transferred player ${player.username} to instance '${transfer.gameId}' " +
+                        "on server '${transfer.serverName}'."
+            )
+        }
         return true
     }
 

@@ -19,7 +19,6 @@ import java.nio.file.StandardWatchEventKinds.*
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
-import java.util.logging.Level
 import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
 
@@ -91,7 +90,7 @@ class ServerListPingHandler {
                             .getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
                     }
                 } catch (e: Exception) {
-                    Komodo.INSTANCE.logger.log(Level.WARNING, "Failed to fetch total player count", e)
+                    Komodo.INSTANCE.logger.warn("Failed to fetch total player count", e)
                     // Keep the previous lastOnlinePlayerCount on gRPC failure
                 }
             }
@@ -104,7 +103,7 @@ class ServerListPingHandler {
                 .samplePlayers(*samplePlayers.toTypedArray())
                 .build()
         } catch (t: Throwable) {
-            Komodo.INSTANCE.logger.log(Level.SEVERE, "Error in onPing handler", t)
+            Komodo.INSTANCE.logger.error("Error in onPing handler", t)
             throw t
         }
     }

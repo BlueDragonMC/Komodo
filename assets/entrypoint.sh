@@ -11,4 +11,4 @@ case "${VELOCITY_HAPROXY_PROTOCOL:-false}" in
         ;;
 esac
 
-exec java -jar proxy.jar
+exec java -Dlog4j.configurationFile=/proxy/log4j2.xml -jar proxy.jar
