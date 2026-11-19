@@ -269,7 +269,7 @@ class Komodo {
     fun onPlayerLeave(event: DisconnectEvent) {
         lastFailover.remove(event.player)
         runBlocking {
-            Stubs.playerTracking.playerLogout(playerLogoutRequest {
+            Stubs.playerTracking.withDeadlineAfter(3, TimeUnit.SECONDS).playerLogout(playerLogoutRequest {
                 username = event.player.username
                 uuid = event.player.uniqueId.toString()
                 proxyPodName = proxyPodName()
@@ -320,7 +320,7 @@ class Komodo {
 
     fun getLobby(serverName: String? = null, excluding: String? = null): Pair<RegisteredServer?, String?> =
         runBlocking {
-            val response = Stubs.discovery.findLobby(findLobbyRequest {
+            val response = Stubs.discovery.withDeadlineAfter(5, TimeUnit.SECONDS).findLobby(findLobbyRequest {
                 if (serverName != null)
                     this.includeServerNames += serverName
                 if (excluding != null)
@@ -341,7 +341,7 @@ class Komodo {
     fun onStop(event: ProxyShutdownEvent) {
         for (player in proxyServer.allPlayers) {
             runBlocking {
-                Stubs.playerTracking.playerLogout(playerLogoutRequest {
+                Stubs.playerTracking.withDeadlineAfter(3, TimeUnit.SECONDS).playerLogout(playerLogoutRequest {
                     username = player.username
                     uuid = player.uniqueId.toString()
                     proxyPodName = proxyPodName()

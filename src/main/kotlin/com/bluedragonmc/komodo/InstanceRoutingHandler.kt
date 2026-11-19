@@ -175,7 +175,7 @@ class InstanceRoutingHandler {
 
     private fun registerLogin(player: Player) {
         runBlocking {
-            Stubs.playerTracking.playerLogin(playerLoginRequest {
+            Stubs.playerTracking.withDeadlineAfter(3, TimeUnit.SECONDS).playerLogin(playerLoginRequest {
                 username = player.username
                 uuid = player.uniqueId.toString()
                 proxyPodName = System.getenv("HOSTNAME")
