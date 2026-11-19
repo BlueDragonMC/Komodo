@@ -11,6 +11,7 @@ import com.velocitypowered.api.event.player.ServerLoginPluginMessageEvent
 import com.velocitypowered.api.event.player.ServerPreConnectEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.server.ServerInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -124,9 +125,11 @@ class InstanceRoutingHandler {
                         playerUuid = player.uniqueId.toString()
                     })
             }
-        } catch (e: Throwable) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             LogContext.with(LogContext.player(player.uniqueId, player.username)) {
-                logger.warn("Could not consume a pending proxy transfer for ${player.username}", e)
+                RpcErrors.log("Could not consume a pending proxy transfer for ${player.username}", e, logger)
             }
             return false
         }

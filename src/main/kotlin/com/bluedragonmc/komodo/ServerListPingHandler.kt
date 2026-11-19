@@ -11,6 +11,7 @@ import io.grpc.Deadline
 import kotlinx.coroutines.*
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.Charset
 import java.nio.file.FileSystems
@@ -23,6 +24,8 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.inputStream
 
 class ServerListPingHandler {
+
+    private val logger = LoggerFactory.getLogger(ServerListPingHandler::class.java)
 
     private val configDir = Paths.get("/proxy/config/")
 
@@ -89,8 +92,10 @@ class ServerListPingHandler {
                             .withDeadline(Deadline.after(3, TimeUnit.SECONDS))
                             .getTotalPlayerCount(ServerTracking.PlayerCountRequest.getDefaultInstance()).totalPlayers
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    Komodo.INSTANCE.logger.warn("Failed to fetch total player count", e)
+                    RpcErrors.log("Failed to fetch total player count", e, Komodo.INSTANCE.logger)
                     // Keep the previous lastOnlinePlayerCount on gRPC failure
                 }
             }
@@ -110,7 +115,8 @@ class ServerListPingHandler {
 
     private val pool = object : CoroutineScope {
         override val coroutineContext: CoroutineContext =
-            Dispatchers.IO + SupervisorJob() + CoroutineName("File I/O")
+            Dispatchers.IO + SupervisorJob() + CoroutineName("File I/O") +
+                RpcErrors.handler("File I/O", logger)
     }
 
     init {

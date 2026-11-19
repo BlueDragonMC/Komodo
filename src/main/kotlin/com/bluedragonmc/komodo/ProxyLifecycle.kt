@@ -185,7 +185,6 @@ class ProxyLifecycle(
             }
         } catch (e: Throwable) {
             logger.error("Error while running the proxy shutdown countdown", e)
-            e.printStackTrace()
         }
     }
 
@@ -254,7 +253,6 @@ class ProxyLifecycle(
             future.join()
         } catch (e: Throwable) {
             logger.error("The proxy shutdown drain did not complete normally", e)
-            e.printStackTrace()
         }
         respond(exchange, 200, "drained")
     }

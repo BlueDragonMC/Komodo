@@ -4,7 +4,6 @@ import com.bluedragonmc.api.grpc.*
 import com.bluedragonmc.api.grpc.GetPlayersResponseKt.connectedPlayer
 import com.bluedragonmc.komodo.command.AddServerCommand
 import com.bluedragonmc.komodo.command.RemoveServerCommand
-import com.bluedragonmc.komodo.LogContext
 import com.google.inject.Inject
 import com.google.protobuf.Empty
 import com.velocitypowered.api.event.Subscribe
@@ -21,14 +20,15 @@ import com.velocitypowered.api.proxy.server.ServerInfo
 import io.grpc.ManagedChannelBuilder
 import io.grpc.Server
 import io.grpc.ServerBuilder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
-import org.slf4j.LoggerFactory
 import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 import kotlin.system.exitProcess
@@ -105,8 +105,7 @@ class Komodo {
             ) { event -> lifecycle.onServerConnected(event.player) }
 
         } catch (e: Throwable) {
-            logger.error("There was an error initializing Komodo.")
-            e.printStackTrace()
+            logger.error("There was an error initializing Komodo.", e)
             exitProcess(1)
         }
     }
@@ -127,9 +126,11 @@ class Komodo {
                             serverName = request.serverName
                             gameId = request.instanceId
                         })
-                } catch (e: Throwable) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
                     LogContext.with(LogContext.player(player.uniqueId, player.username)) {
-                        logger.warn("Could not prepare a proxy transfer for ${player.username}", e)
+                        RpcErrors.log("Could not prepare a proxy transfer for ${player.username}", e, logger)
                     }
                     null
                 }
@@ -156,7 +157,9 @@ class Komodo {
                             successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.SET_INSTANCE
                             successes += PlayerHolderOuterClass.SendPlayerResponse.SuccessFlags.TRANSFERRED
                         }
-                    } catch (e: Throwable) {
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
                         LogContext.with(LogContext.player(player.uniqueId, player.username)) {
                             logger.warn("Could not transfer ${player.username} to the replacement proxy", e)
                         }
@@ -198,7 +201,9 @@ class Komodo {
             try {
                 instanceRoutingHandler.route(player, request.instanceId.toString())
                 player.createConnectionRequest(registeredServer).fireAndForget()
-            } catch (e: Throwable) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 LogContext.with(LogContext.player(player.uniqueId, player.username)) {
                     logger.warn("Error sending player ${player.username} to server $registeredServer!", e)
                 }
@@ -233,10 +238,12 @@ class Komodo {
                 } finally {
                     channel.shutdown()
                 }
-            } catch (e: Throwable) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 LogContext.with(LogContext.player(request.playerUuid)) {
-                    logger.warn(
-                        "Could not forward player ${request.playerUuid} to game server $address:$port", e
+                    RpcErrors.log(
+                        "Could not forward player ${request.playerUuid} to game server $address:$port", e, logger
                     )
                 }
                 null
