@@ -10,7 +10,7 @@ coroutines = "1.11.0"
 grpc = "1.85.1"
 grpc-kotlin-stub = "1.5.0"
 protobuf = "4.36.2"
-rpc = "2026-10-31-015108b"
+rpc = "2026-11-23-1e33d92"
 
 [libraries]
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }

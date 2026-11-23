@@ -1,5 +1,6 @@
 package com.bluedragonmc.komodo
 
+import com.bluedragonmc.api.RpcRetryPolicy
 import com.bluedragonmc.api.grpc.InstanceServiceGrpcKt
 import com.bluedragonmc.api.grpc.LobbyServiceGrpcKt
 import com.bluedragonmc.api.grpc.PlayerTrackerGrpcKt
@@ -23,6 +24,7 @@ object Stubs {
         return ManagedChannelBuilder.forTarget(uri)
             .defaultLoadBalancingPolicy("round_robin")
             .usePlaintext()
+            .defaultServiceConfig(RpcRetryPolicy.serviceConfig)
             .enableRetry()
             .build()
     }

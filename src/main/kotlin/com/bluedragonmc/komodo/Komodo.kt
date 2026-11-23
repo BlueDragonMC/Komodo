@@ -321,6 +321,7 @@ class Komodo {
     fun getLobby(serverName: String? = null, excluding: String? = null): Pair<RegisteredServer?, String?> =
         runBlocking {
             val response = Stubs.discovery.withDeadlineAfter(5, TimeUnit.SECONDS).findLobby(findLobbyRequest {
+                this.requestId = UUID.randomUUID().toString()
                 if (serverName != null)
                     this.includeServerNames += serverName
                 if (excluding != null)
